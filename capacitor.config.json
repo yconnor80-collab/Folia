@@ -1,0 +1,8 @@
+{
+  "appId": "app.folia.major",
+  "appName": "Folia",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
