@@ -24,15 +24,34 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
+      - name: Show ios folder structure
+        run: find ios -maxdepth 3 | head -n 100
+
       - name: Archive unsigned
         run: |
-          cd ios/App
-          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath App.xcarchive archive CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS=""
+          set -e
+          PROJ_DIR=$(dirname "$(find ios -maxdepth 3 -name '*.xcodeproj' | head -n 1)")
+          echo "Xcode project folder: $PROJ_DIR"
+          cd "$PROJ_DIR"
+          SCHEME=$(xcodebuild -list 2>/dev/null | sed -n '/Schemes:/,$p' | sed -n '2p' | xargs)
+          if [ -z "$SCHEME" ]; then SCHEME=$(basename "$(find . -maxdepth 1 -name '*.xcodeproj' | head -n 1)" .xcodeproj); fi
+          echo "Scheme: $SCHEME"
+          WS=$(find . -maxdepth 1 -name '*.xcworkspace' | head -n 1)
+          if [ -n "$WS" ]; then
+            echo "Using workspace: $WS"
+            xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release -archivePath "$PWD/out.xcarchive" archive CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS=""
+          else
+            PROJ=$(find . -maxdepth 1 -name '*.xcodeproj' | head -n 1)
+            echo "Using project: $PROJ"
+            xcodebuild -project "$PROJ" -scheme "$SCHEME" -configuration Release -archivePath "$PWD/out.xcarchive" archive CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS=""
+          fi
 
       - name: Package as ipa
         run: |
+          APP_PATH=$(find ios -type d -name '*.app' -path '*Products/Applications*' | head -n 1)
+          echo "App found at: $APP_PATH"
           mkdir Payload
-          cp -r ios/App/App.xcarchive/Products/Applications/App.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r App-unsigned.ipa Payload
 
       - name: Upload ipa artifact
