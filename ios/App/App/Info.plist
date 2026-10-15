@@ -2,21 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>Folia</string>
-	...
-	<key>UIBackgroundModes</key>
-	<array>
-		<string>audio</string>
-	</array>
-	...
-</dict>
-
-<key>CFBundleExecutable</key>
+	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
@@ -32,25 +24,19 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UIApplicationSceneManifest</key>
+	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>UIApplicationSupportsMultipleScenes</key>
-    <false/>
-    <key>UISceneConfigurations</key>
-    <dict>
-      <key>UIWindowSceneSessionRoleApplication</key>
-      <array>
-        <dict>
-            <key>UISceneConfigurationName</key>
-            <string>Default Configuration</string>
-            <key>UISceneDelegateClassName</key>
-            <string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-            <key>UISceneStoryboardFile</key>
-            <string>Main</string>
-        </dict>
-      </array>
-    </dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Folia 需要使用相机扫描登录二维码</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Folia 需要访问相册以选择图片</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
