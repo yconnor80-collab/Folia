@@ -1,0 +1,42 @@
+name: Build iOS ipa
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web
+        run: npx vite build
+
+      - name: Sync Capacitor
+        run: npx cap sync ios
+
+      - name: Archive unsigned
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath App.xcarchive archive CODE_SIGNING_ALLOWED=NO CODE_SIGN_IDENTITY="" CODE_SIGN_ENTITLEMENTS=""
+
+      - name: Package as ipa
+        run: |
+          mkdir Payload
+          cp -r ios/App/App.xcarchive/Products/Applications/App.app Payload/
+          zip -r App-unsigned.ipa Payload
+
+      - name: Upload ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: App-unsigned
+          path: App-unsigned.ipa
