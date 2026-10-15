@@ -21,7 +21,8 @@ jobs:
       - name: Build web
         run: npx vite build
         env:
-          VITE_NETEASE_API_BASE: 'https://ncm.landdy.cn'
+          VITE_NETEASE_API_BASE: 'https://music.mcseekeri.com'
+
 
 
       - name: Sync Capacitor
