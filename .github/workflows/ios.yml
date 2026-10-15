@@ -20,6 +20,9 @@ jobs:
 
       - name: Build web
         run: npx vite build
+        env:
+          VITE_NETEASE_API_BASE: 'https://ncm.landdy.cn'
+
 
       - name: Sync Capacitor
         run: npx cap sync ios
