@@ -7,8 +7,16 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Folia</string>
-	<key>CFBundleExecutable</key>
+	<string>Folia</string>
+	...
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+	</array>
+	...
+</dict>
+
+<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
