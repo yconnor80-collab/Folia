@@ -8,6 +8,14 @@
     "process.env.JEST_WORKER_ID": "undefined",
     "process.env.LOG_LEVEL": "undefined"
   },
+  "durable_objects": {
+    "bindings": [
+      { "name": "QQ_QR_CHANNEL", "class_name": "QqQrChannel" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["QqQrChannel"] }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
