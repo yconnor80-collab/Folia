@@ -22,6 +22,7 @@ jobs:
         run: npx vite build
         env:
           VITE_NETEASE_API_BASE: 'https://folia-api.top'
+          VITE_QQ_API_BASE: 'https://music.folia-api.top/api/qq'
 
 
 
