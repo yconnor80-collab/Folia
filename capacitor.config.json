@@ -1,10 +1,13 @@
 {
   "appId": "app.folia.major",
   "appName": "Folia",
+  "webDir": "dist",
   "plugins": {
     "CapacitorHttp": {
       "enabled": true
     }
   },
-  "androidScheme": "https"
+  "server": {
+    "androidScheme": "https"
+  }
 }
