@@ -23,7 +23,7 @@ jobs:
         env:
 
           VITE_NETEASE_API_BASE: 'https://netease.folia-api.top'
-          VITE_QQ_API_BASE: 'https://qq.folia-api.top/api/qq'
+          VITE_QQ_API_BASE:  /api/qq
 
 
 
