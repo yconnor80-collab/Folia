@@ -8,6 +8,8 @@
     }
   },
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "url": "https://app.folia-api.top",
+    "cleartext": true
   }
 }
