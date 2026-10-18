@@ -310,54 +310,58 @@
     </script>
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
-<!-- ========== 赞赏入口 开始 ========== -->
+<!-- ========== 赞赏弹窗 开始 ========== -->
 <style>
-  #donate-fab{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2147482000}
-  #donate-fab button{border:0;border-radius:999px;padding:10px 18px;font-size:14px;font-weight:600;
-    color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);
-    box-shadow:0 4px 14px rgba(255,77,109,.45);cursor:pointer}
   #donate-mask{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
-    background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:2147482500}
+    background:rgba(0,0,0,.68);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    z-index:2147482500;padding:20px}
   #donate-mask.show{display:flex}
-  #donate-card{background:#fff;border-radius:16px;padding:22px 22px 18px;max-width:80vw;
-    text-align:center;animation:dp .22s ease}
-  #donate-card img{width:min(62vw,260px);border-radius:10px;display:block}
-  #donate-card p{margin:12px 0 0;font-size:14px;color:#555}
+  #donate-card{background:#fff;border-radius:18px;padding:20px 20px 16px;max-width:86vw;width:340px;
+    text-align:center;animation:dp .24s ease;box-shadow:0 18px 60px rgba(0,0,0,.45)}
+  #donate-card .donate-title{font-size:17px;font-weight:700;color:#1f1f1f;letter-spacing:.02em}
+  #donate-card img{width:min(62vw,240px);border-radius:10px;display:block;margin:14px auto 0}
+  #donate-card p{margin:10px 0 0;font-size:13px;color:#666;line-height:1.5}
+  #donate-card p.hint{font-size:12px;color:#9a9a9a;margin-top:4px}
   #donate-close{margin-top:14px;border:0;background:#f2f3f5;color:#333;font-size:14px;
-    padding:8px 28px;border-radius:999px;cursor:pointer}
-  @keyframes dp{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+    padding:9px 34px;border-radius:999px;cursor:pointer}
+  @keyframes dp{from{transform:scale(.88);opacity:0}to{transform:scale(1);opacity:1}}
 </style>
-
-<div id="donate-fab"><button id="donate-open">❤️ 赞赏</button></div>
 
 <div id="donate-mask">
   <div id="donate-card">
-    <img src="/appreciate-qr.png" alt="赞赏码">
-    <p>感谢你的支持,这是我更新的动力 ❤️</p>
-    <p style="font-size:12px;color:#999;margin-top:4px">长按二维码可保存到相册</p>
+    <div class="donate-title">给 Ex 赞赏</div>
+    <img src="/appreciate-qr.jpg" alt="赞赏码">
+    <p>如果 Folia 帮到你了，可以请我喝杯咖啡 ❤️</p>
+    <p class="hint">长按二维码可保存到相册</p>
     <button id="donate-close">关闭</button>
   </div>
 </div>
 
 <script>
 (function(){
-  // OBS 浏览器源 / 透明背景模式:移除赞赏按钮,避免被推流捕获
+  // OBS 浏览器源 / 透明背景 / 免开屏模式：不弹
   try {
     var p = new URLSearchParams(window.location.search);
-    if (p.get('obs') === '1' || window.location.pathname === '/obs' || p.get('splash') === '0') {
-      var fab = document.getElementById('donate-fab');
-      if (fab) fab.remove();
-      return;
-    }
+    if (p.get('obs') === '1' || window.location.pathname === '/obs' || p.get('splash') === '0') return;
   } catch (e) {}
+
   var mask = document.getElementById('donate-mask');
-  document.getElementById('donate-open').addEventListener('click', function(){ mask.classList.add('show'); });
+  if (!mask) return;
+
+  // 每次冷启动只弹一次：App 大退重进 = 新 WebView = 会再弹；同一次会话内刷新不重复弹
+  var KEY = 'folia.donate.shown';
+  var shown = false;
+  try { shown = sessionStorage.getItem(KEY) === '1'; } catch (e) {}
+  if (!shown) {
+    setTimeout(function(){ mask.classList.add('show'); }, 1600);
+    try { sessionStorage.setItem(KEY, '1'); } catch (e) {}
+  }
+
   document.getElementById('donate-close').addEventListener('click', function(){ mask.classList.remove('show'); });
   mask.addEventListener('click', function(e){ if (e.target === mask) mask.classList.remove('show'); });
 })();
 </script>
-
-<!-- ========== 赞赏入口 结束 ========== -->
+<!-- ========== 赞赏弹窗 结束 ========== -->
 
   </body>
 </html>
