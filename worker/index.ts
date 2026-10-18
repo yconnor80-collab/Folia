@@ -63,6 +63,16 @@ export default {
         );
       }
     }
+    // KuGou API 同源反代 -> 转发到 Vercel 上的 KuGouMusicApi
+    // 前端构建时把 VITE_KUGOU_API_BASE 设为 /api/kugou 即可同源调用，避免 vercel.app 在国内被墙。
+    if (url.pathname === "/api/kugou" || url.pathname.startsWith("/api/kugou/")) {
+      const KUGOU_API_BASE = "https://ku-gou-music-api-steel.vercel.app";
+      const target =
+        KUGOU_API_BASE +
+        url.pathname.slice("/api/kugou".length) +
+        url.search;
+      return fetch(new Request(target, request));
+    }
 
     return env.ASSETS.fetch(request);
   },
