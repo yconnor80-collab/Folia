@@ -24,6 +24,7 @@ jobs:
 
           VITE_NETEASE_API_BASE: 'https://netease.folia-api.top'
           VITE_QQ_API_BASE:  /api/qq
+          VITE_KUGOU_API_BASE: /api/kugou
 
 
 
