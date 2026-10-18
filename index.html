@@ -310,5 +310,54 @@
     </script>
     <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
+<!-- ========== 赞赏入口 开始 ========== -->
+<style>
+  #donate-fab{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom));z-index:2147482000}
+  #donate-fab button{border:0;border-radius:999px;padding:10px 18px;font-size:14px;font-weight:600;
+    color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);
+    box-shadow:0 4px 14px rgba(255,77,109,.45);cursor:pointer}
+  #donate-mask{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:2147482500}
+  #donate-mask.show{display:flex}
+  #donate-card{background:#fff;border-radius:16px;padding:22px 22px 18px;max-width:80vw;
+    text-align:center;animation:dp .22s ease}
+  #donate-card img{width:min(62vw,260px);border-radius:10px;display:block}
+  #donate-card p{margin:12px 0 0;font-size:14px;color:#555}
+  #donate-close{margin-top:14px;border:0;background:#f2f3f5;color:#333;font-size:14px;
+    padding:8px 28px;border-radius:999px;cursor:pointer}
+  @keyframes dp{from{transform:scale(.85);opacity:0}to{transform:scale(1);opacity:1}}
+</style>
+
+<div id="donate-fab"><button id="donate-open">❤️ 赞赏</button></div>
+
+<div id="donate-mask">
+  <div id="donate-card">
+    <img src="/appreciate-qr.png" alt="赞赏码">
+    <p>感谢你的支持,这是我更新的动力 ❤️</p>
+    <p style="font-size:12px;color:#999;margin-top:4px">长按二维码可保存到相册</p>
+    <button id="donate-close">关闭</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  // OBS 浏览器源 / 透明背景模式:移除赞赏按钮,避免被推流捕获
+  try {
+    var p = new URLSearchParams(window.location.search);
+    if (p.get('obs') === '1' || window.location.pathname === '/obs' || p.get('splash') === '0') {
+      var fab = document.getElementById('donate-fab');
+      if (fab) fab.remove();
+      return;
+    }
+  } catch (e) {}
+  var mask = document.getElementById('donate-mask');
+  document.getElementById('donate-open').addEventListener('click', function(){ mask.classList.add('show'); });
+  document.getElementById('donate-close').addEventListener('click', function(){ mask.classList.remove('show'); });
+  mask.addEventListener('click', function(e){ if (e.target === mask) mask.classList.remove('show'); });
+})();
+</script>
+
+<!-- ========== 赞赏入口 结束 ========== -->
+
   </body>
 </html>
