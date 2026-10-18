@@ -223,7 +223,14 @@
     "kugoumusicapi": "https://github.com/MakcRe/KuGouMusicApi/archive/refs/tags/v1.6.0.tar.gz",
     "music-metadata": "^11.16.1",
     "onnxruntime-node": "^1.30.0",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "framer-motion": "12.23.24",
+    "lucide-react": "0.554.0",
+    "i18next": "25.6.3",
+    "react-i18next": "16.3.5",
+    "i18next-browser-languagedetector": "8.2.0"
   },
   "devDependencies": {
     "@applemusic-like-lyrics/ttml": "^1.0.1",
