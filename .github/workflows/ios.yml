@@ -28,6 +28,19 @@ jobs:
 
 
 
+      - name: Pin remote URL
+        run: |
+          python3 - <<'PY'
+          import io, json
+          p = 'capacitor.config.json'
+          cfg = json.load(io.open(p, encoding='utf-8'))
+          srv = cfg.setdefault('server', {})
+          srv['androidScheme'] = 'https'
+          srv['url'] = 'https://app.folia-api.top'
+          srv['cleartext'] = True
+          io.open(p, 'w', encoding='utf-8').write(json.dumps(cfg, ensure_ascii=False, indent=2))
+          print(io.open(p, encoding='utf-8').read())
+          PY
       - name: Sync Capacitor
         run: npx cap sync ios
 
