@@ -4,7 +4,7 @@
   "webDir": "dist",
   "server": {
     "androidScheme": "https",
-    "url": "https://app.folia-api.top",
+    "url": "https://music.foliafast.top",
     "cleartext": true
   }
 }
