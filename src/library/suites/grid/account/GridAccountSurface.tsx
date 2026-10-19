@@ -18,6 +18,7 @@ import {
 import OnlineProviderLoginModal from './OnlineProviderLoginModal';
 import { buildQrLoginFailureHelpProps } from './buildQrLoginFailureHelpProps';
 import ConfirmDialog from '../../../../components/shared/ConfirmDialog';
+import { kugouProvider } from '../../../../services/onlineMusic/kugouProvider';
 import qqIcon from '../../../../assets/providers/qq.svg';
 import wechatIcon from '../../../../assets/providers/wechat.svg';
 
@@ -121,9 +122,40 @@ const GridAccountSurface: React.FC<LibraryAccountSurfaceProps> = ({ account, isD
         backendRestart: hasAction(declaredActions.actions, 'account-backend-restart'),
     };
 
+    // 酷狗的第二条登录通道：手机号 + 验证码。只在该 provider 声明了这两个方法时出现，
+    // 扫码流程与它的 props 完全独立（不传 phoneLogin 时弹窗外观与原来一模一样）。
+    // 这里直接调 provider（等价于 omni 的同名能力），成功后关弹窗并刷新页面让账号状态重新拉取。
+    const phoneLogin = login?.session.providerId === 'kugou'
+        && typeof kugouProvider.auth?.sendLoginCode === 'function'
+        && typeof kugouProvider.auth?.loginWithPhone === 'function'
+        ? {
+            title: t('account.phoneLogin.title', '手机号登录（酷狗）'),
+            hint: t('account.phoneLogin.hint', '收不到短信时用上面的扫码登录；两种方式任选其一。'),
+            mobilePlaceholder: t('account.phoneLogin.mobile', '手机号'),
+            codePlaceholder: t('account.phoneLogin.code', '短信验证码'),
+            sendCodeLabel: t('account.phoneLogin.sendCode', '发送验证码'),
+            sendingLabel: t('account.phoneLogin.sending', '发送中…'),
+            submitLabel: t('account.phoneLogin.submit', '登录'),
+            submittingLabel: t('account.phoneLogin.submitting', '登录中…'),
+            onSendCode: async (mobile: string) => {
+                await kugouProvider.auth!.sendLoginCode!(mobile);
+            },
+            onSubmit: async (mobile: string, code: string) => {
+                await kugouProvider.auth!.loginWithPhone!(mobile, code);
+                account.closeLogin();
+                window.setTimeout(() => window.location.reload(), 600);
+            },
+        }
+        : undefined;
+
     const loginModal = (
         <AnimatePresence>
-            {login?.visible && <OnlineProviderLoginModal {...buildLoginModalProps(login, account, t, features)} />}
+            {login?.visible && (
+                <OnlineProviderLoginModal
+                    {...buildLoginModalProps(login, account, t, features)}
+                    phoneLogin={phoneLogin}
+                />
+            )}
         </AnimatePresence>
     );
     const canPortal = typeof document !== 'undefined';
