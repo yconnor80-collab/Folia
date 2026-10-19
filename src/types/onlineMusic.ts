@@ -435,6 +435,10 @@ export interface OnlineAuthProvider {
     // canRunQrLoginSelfCheck 同步回答此刻能不能检查（界面据此决定要不要显示「正在检查」）。
     canRunQrLoginSelfCheck?(): boolean;
     runQrLoginSelfCheck?(): Promise<LoginSelfCheckResult | null>;
+    // 非扫码登录通道（目前只有酷狗的手机号 + 验证码）。声明了这两个方法，登录弹窗才会在二维码下方
+    // 多给一块手机号表单；不声明就完全维持原来的扫码单通道外观。扫码流程与它互不影响。
+    sendLoginCode?(mobile: string): Promise<void>;
+    loginWithPhone?(mobile: string, code: string): Promise<void>;
 }
 
 export interface OnlineLibraryProvider {
