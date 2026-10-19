@@ -351,7 +351,7 @@
 <div id="boot-fail" style="display:none;position:fixed;inset:0;z-index:2147483600;background:#0b0b0d;color:#eee;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font:14px/1.7 -apple-system,system-ui,'Segoe UI',sans-serif">
   <div style="font-size:17px;font-weight:600">页面没能加载完成</div>
   <div id="boot-fail-detail" style="color:#98a2b3;font-size:12px;max-width:32em;word-break:break-all"></div>
-  <button id="boot-fail-retry" style="border:0;border-radius:999px;padding:11px 26px;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);cursor:pointer">清除缓存并重试</button>
+  <button id="boot-fail-reload" style="border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:9px 20px;font-size:13px;color:#e5e7eb;background:transparent;cursor:pointer;margin-right:8px">重新加载</button><button id="boot-fail-retry" style="border:0;border-radius:999px;padding:11px 26px;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);cursor:pointer">清除缓存并重试</button>
   <div style="color:#6b7280;font-size:12px;max-width:30em">如果一直失败，通常是网络到 Cloudflare 不通：换个网络（如切 4G/5G）或稍后再试。</div>
 </div>
 <script>
@@ -367,7 +367,7 @@
   }
   setTimeout(function () {
     if (document.getElementById('app-splash')) reveal('等待超时：脚本可能没下载完，或浏览器缓存了旧版本。');
-  }, 12000);
+  }, 8000);
   window.addEventListener('error', function (e) {
     var t = e && e.target;
     if (t && t.tagName === 'SCRIPT') reveal('脚本加载失败：' + (t.src || '未知地址'));
@@ -376,6 +376,8 @@
     var r = e && e.reason;
     if (r && String(r).indexOf('Importing a module script failed') >= 0) reveal('模块加载失败：' + String(r));
   });
+  var reloadBtn = document.getElementById('boot-fail-reload');
+  if (reloadBtn) reloadBtn.addEventListener('click', function () { location.reload(); });
   var btn = document.getElementById('boot-fail-retry');
   if (btn) btn.addEventListener('click', function () {
     btn.disabled = true; btn.textContent = '清理中…';
