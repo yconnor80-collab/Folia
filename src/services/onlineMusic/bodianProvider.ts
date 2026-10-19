@@ -107,7 +107,17 @@ export const bodianProvider: OnlineMusicProvider = {
         getQrTtlMs: () => 5 * 60 * 1000,
     },
     catalog: bodianCatalog,
-    library: bodianLibrary,
+    library: {
+        ...bodianLibrary,
+        // 账号刷新会顺带拉歌单：上游结构对不上时不能让整个登录被判失败，退回空列表即可。
+        async getUserPlaylists(userId, limit, offset) {
+            try {
+                return await bodianLibrary.getUserPlaylists(userId, limit, offset);
+            } catch {
+                return { items: [], hasMore: false, nextOffset: offset } as Awaited<ReturnType<typeof bodianLibrary.getUserPlaylists>>;
+            }
+        },
+    },
     mutations: bodianMutations,
     recommendations: {
         async getRecommendedCollections(limit) {
