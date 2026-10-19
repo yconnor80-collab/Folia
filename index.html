@@ -370,11 +370,17 @@
   }, 8000);
   window.addEventListener('error', function (e) {
     var t = e && e.target;
-    if (t && t.tagName === 'SCRIPT') reveal('脚本加载失败：' + (t.src || '未知地址'));
+    if (t && t.tagName === 'SCRIPT') { reveal('脚本加载失败：' + (t.src || '未知地址')); return; }
+    if (t && t.tagName === 'IMG') return;
+    var msg = (e && (e.message || (e.error && e.error.message))) || '';
+    var where = e && e.filename ? (' @ ' + e.filename + ':' + (e.lineno || 0)) : '';
+    reveal('运行时错误：' + (msg || '未知错误') + where);
   }, true);
   window.addEventListener('unhandledrejection', function (e) {
     var r = e && e.reason;
-    if (r && String(r).indexOf('Importing a module script failed') >= 0) reveal('模块加载失败：' + String(r));
+    var text = r && (r.message || String(r));
+    if (r && String(r).indexOf('Importing a module script failed') >= 0) { reveal('模块加载失败：' + String(r)); return; }
+    if (text) reveal('未处理的异常：' + String(text).slice(0, 300));
   });
   var reloadBtn = document.getElementById('boot-fail-reload');
   if (reloadBtn) reloadBtn.addEventListener('click', function () { location.reload(); });
