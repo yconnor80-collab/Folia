@@ -303,11 +303,23 @@ const qrStatusSoda = async (request: Request): Promise<Response> => {
     } catch {
         return errorJson('soda qr status returned a non-JSON body');
     }
-    const data = payload?.data?.data ?? payload?.data ?? {};
+    // 上游在「已确认」这一步的响应结构会变：status 可能只出现在 data 层，甚至缺失。
+    // 这里按多路径取值，并且只要拿到 sessionid 就一律按 confirmed 处理（sessionid 才是登录成功的凭据）。
+    const outer = payload?.data ?? {};
+    const inner = outer?.data ?? {};
+    const status = String(outer.status ?? inner.status ?? payload?.status ?? '').trim();
+    const sessionid = sessionIdOf(response);
+    const errorCode = Number(outer.error_code ?? inner.error_code ?? payload?.error_code ?? 0) || 0;
     return json({
-        status: String(data.status || ''),
-        sessionid: sessionIdOf(response),
-        errorCode: Number(data.error_code) || 0,
+        status: sessionid ? 'confirmed' : status,
+        sessionid,
+        errorCode,
+        // 状态既不是已知值又没有 sessionid 时，把响应骨架带回去，方便定位（不含 Cookie）。
+        trace: status || sessionid ? undefined : {
+            keys: Object.keys(outer).slice(0, 12),
+            message: String(payload?.message || '').slice(0, 80),
+            statusRaw: String(payload?.status ?? ''),
+        },
     });
 };
 
