@@ -354,7 +354,6 @@
   <div>
     <button id="boot-fail-reload" style="border:0;border-radius:999px;padding:11px 26px;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);cursor:pointer;margin-right:8px">重新加载</button>
     <button id="boot-fail-retry" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 18px;font-size:12px;color:#9ca3af;background:transparent;cursor:pointer">清除缓存</button>
-    <button id="boot-fail-alt" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 18px;font-size:12px;color:#9ca3af;background:transparent;cursor:pointer">换个入口</button>
     <button id="boot-fail-copy" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 18px;font-size:12px;color:#9ca3af;background:transparent;cursor:pointer;margin-left:8px">复制诊断</button>
   </div>
   <pre id="boot-fail-diag" style="display:none;max-width:36em;max-height:40vh;overflow:auto;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.5;color:#9ca3af;background:#111114;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;margin:0"></pre>
@@ -424,12 +423,6 @@
     if (r && String(r).indexOf('Importing a module script failed') >= 0) { reveal('模块加载失败：' + String(r)); return; }
     if (!stillBooting()) return;
     if (text) { lastError = String(text); reveal('未处理的异常：' + String(text).slice(0, 300)); }
-  });
-  // 主站这条线卡死时，换一个主机名（同一 Worker，走不同 CF 线路）再试。
-  var altBtn = document.getElementById('boot-fail-alt');
-  if (altBtn) altBtn.addEventListener('click', function () {
-    var alt = 'https://folia-qq-api.1209340245.workers.dev';
-    location.replace(alt + location.pathname + location.search);
   });
   var copyBtn = document.getElementById('boot-fail-copy');
   if (copyBtn) copyBtn.addEventListener('click', function () {
