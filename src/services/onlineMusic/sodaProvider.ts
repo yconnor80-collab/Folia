@@ -45,6 +45,9 @@ export const sodaProvider: OnlineMusicProvider = {
         search: true,
         playback: true,
         lyrics: false,
+        // 汽水没有账户体系：显式 false 才会被 omni 标成 requiresAccount=false，
+        // 选平台时直接切换而不是拉起登录（否则会进扫码流程并报「登录错误」）。
+        auth: false,
     },
     normalizeSong: normalizeSodaSong,
     search: {
