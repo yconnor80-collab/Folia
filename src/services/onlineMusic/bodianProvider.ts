@@ -48,20 +48,6 @@ async function getBodianDiscoverCollections(): Promise<ProviderCollection[]> {
 
 /** 账号刷新会顺带读歌单/喜欢：任何一处抛错都会把登录判成失败。
  *  这里统一兜住——记录到诊断（哪一个方法、什么错误），并返回安全的空结构。 */
-const safeBodianLibrary = Object.fromEntries(Object.entries(bodianLibrary).map(([name, fn]) => [
-    name,
-    async (...args: unknown[]) => {
-        try {
-            return await (fn as (...inner: unknown[]) => Promise<unknown>)(...args);
-        } catch (error) {
-            try { recordBodianFailure(`library.${name}`, error); } catch { /* ignore */ }
-            if (name === 'getLikedSongIds' || name === 'getLikedSongs') return [];
-            if (name === 'getUserPlaylists' || name === 'getUserAlbums') return { items: [], hasMore: false, nextOffset: Number(args[2]) || 0 };
-            return null;
-        }
-    },
-])) as typeof bodianLibrary;
-
 export const bodianProvider: OnlineMusicProvider = {
     id: 'bodian', displayName: '波点音乐', shortName: '波点',
     getAvailability: getBodianTransportAvailability,
@@ -125,8 +111,7 @@ export const bodianProvider: OnlineMusicProvider = {
         async getQrLoginDiagnostics() { return describeBodianState(); },
     },
     catalog: bodianCatalog,
-    library: safeBodianLibrary,
-    __legacyLibrary: {
+    library: {
         ...bodianLibrary,
         // 账号刷新会顺带拉歌单：上游结构对不上时不能让整个登录被判失败，退回空列表即可。
         async getUserPlaylists(userId, limit, offset) {
