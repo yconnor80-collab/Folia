@@ -139,7 +139,7 @@ function attachRuntime(pixi: typeof import('pixi.js'), app: import('pixi.js').Ap
             }
             app.render();
             return moving;
-        } catch (error) { reportError(error); return false; }
+        } catch (error) { reportError(error); try { app.canvas.style.visibility = 'hidden'; } catch { /* ignore */ } return false; }
     };
     const loop = createLatticeLyricFrameLoop(draw);
     let unsubscribe = input.currentTime.on('change', loop.wake);
