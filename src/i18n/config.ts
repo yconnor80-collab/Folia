@@ -3,7 +3,6 @@ import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import en from './locales/en.ts';
 import zhCN from './locales/zh-CN.ts';
-import ind from './locales/in.ts';
 import { resolveMissingTranslation } from './missingTranslation';
 
 /*
@@ -92,9 +91,6 @@ i18n
       'zh-CN': {
         translation: zhCN
       },
-      in: {
-        translation: ind
-      }
     },
     fallbackLng: 'en',
     parseMissingKeyHandler: (key: string, defaultValue?: string): string => (
@@ -111,6 +107,21 @@ i18n
       escapeValue: false
     }
   });
+
+/*
+ * 印尼语字典（约 365 KB）从启动包里移出：切到该语言时再动态加载并注册。
+ * 其它两种语言（en / zh-CN）仍随启动包一起到达，首屏文案不受影响。
+ */
+const loadIndonesian = async (): Promise<void> => {
+  if (i18n.hasResourceBundle('in', 'translation')) return;
+  const module = await import('./locales/in.ts');
+  i18n.addResourceBundle('in', 'translation', module.default, true, true);
+};
+
+i18n.on('languageChanged', (language: string) => {
+  if (language === 'in') void loadIndonesian();
+});
+if (i18n.language === 'in') void loadIndonesian();
 
 /*
  * The Electron main process keeps its own tiny locale table for the tray menu and
