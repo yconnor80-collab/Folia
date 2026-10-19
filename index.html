@@ -386,23 +386,38 @@
   if (reloadBtn) reloadBtn.addEventListener('click', function () { location.reload(); });
   var btn = document.getElementById('boot-fail-retry');
   if (btn) btn.addEventListener('click', function () {
-    btn.disabled = true; btn.textContent = '清理中…';
-    var tasks = [];
+    if (btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    btn.disabled = true;
+    btn.textContent = '正在清理…';
+    var done = false;
+    // 无论如何 2.5 秒内都要走：iOS 上 caches.delete 可能卡很久，不能一直转圈。
+    var go = function () {
+      if (done) return;
+      done = true;
+      location.replace(location.pathname + '?fresh=' + Date.now());
+    };
+    var cap = function (promise, ms) {
+      return Promise.race([
+        Promise.resolve(promise).catch(function () {}),
+        new Promise(function (resolve) { setTimeout(resolve, ms); }),
+      ]);
+    };
+    var jobs = [];
     try {
       if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-        tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        jobs.push(cap(navigator.serviceWorker.getRegistrations().then(function (rs) {
           return Promise.all(rs.map(function (x) { return x.unregister(); }));
-        }).catch(function () {}));
+        }), 1500));
       }
       if (window.caches && caches.keys) {
-        tasks.push(caches.keys().then(function (ks) {
+        jobs.push(cap(caches.keys().then(function (ks) {
           return Promise.all(ks.map(function (k) { return caches.delete(k); }));
-        }).catch(function () {}));
+        }), 1200));
       }
     } catch (err) {}
-    Promise.all(tasks).then(function () {
-      location.replace(location.pathname + '?fresh=' + Date.now());
-    });
+    Promise.all(jobs).then(go, go);
+    setTimeout(go, 2500);
   });
   try {
     if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
