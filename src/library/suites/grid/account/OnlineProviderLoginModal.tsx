@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, Loader2, RotateCcw, ServerCog, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import QrLoginFailureHelp, { type QrLoginFailureHelpProps } from './QrLoginFailureHelp';
@@ -44,8 +45,137 @@ type OnlineProviderLoginModalProps = {
     backendFailure?: BackendFailureProps;
     // 只在扫码登录失败时传入（含后端没拉起来），显示在二维码旁边。
     failureHelp?: QrLoginFailureHelpProps;
+    // 与二维码并存的第二条通道（酷狗的手机号 + 验证码）。不传就不渲染，扫码外观完全不变。
+    phoneLogin?: PhoneLoginProps;
     onRetry: () => void;
     onClose: () => void;
+};
+
+// 手机号 + 验证码登录块。文案与回调都由调用方给，这里只管本地表单状态与冷却计时。
+type PhoneLoginProps = {
+    title: string;
+    hint: string;
+    mobilePlaceholder: string;
+    codePlaceholder: string;
+    sendCodeLabel: string;
+    sendingLabel: string;
+    submitLabel: string;
+    submittingLabel: string;
+    /** 成功后由调用方决定后续（关闭弹窗、刷新账号）。 */
+    onSendCode: (mobile: string) => Promise<void>;
+    onSubmit: (mobile: string, code: string) => Promise<void>;
+};
+
+// 手机号 + 验证码表单：自管理输入、发送冷却（60s）与请求中状态，成败由回调抛错/返回决定。
+// 放在二维码下方作为第二条通道，不影响上面扫码流程的任何状态。
+const PhoneLoginForm = ({
+    title,
+    hint,
+    mobilePlaceholder,
+    codePlaceholder,
+    sendCodeLabel,
+    sendingLabel,
+    submitLabel,
+    submittingLabel,
+    onSendCode,
+    onSubmit,
+}: PhoneLoginProps) => {
+    const [mobile, setMobile] = useState('');
+    const [code, setCode] = useState('');
+    const [sending, setSending] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+    const [error, setError] = useState<string | null>(null);
+    const [sent, setSent] = useState(false);
+
+    useEffect(() => {
+        if (cooldown <= 0) return undefined;
+        const timer = window.setTimeout(() => setCooldown(value => value - 1), 1000);
+        return () => window.clearTimeout(timer);
+    }, [cooldown]);
+
+    const mobileValid = /^1\d{10}$/.test(mobile.trim());
+    const canSend = mobileValid && !sending && cooldown === 0;
+    const canSubmit = mobileValid && code.trim().length > 0 && !submitting;
+
+    const handleSend = async () => {
+        if (!canSend) return;
+        setError(null);
+        setSending(true);
+        try {
+            await onSendCode(mobile.trim());
+            setSent(true);
+            setCooldown(60);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!canSubmit) return;
+        setError(null);
+        setSubmitting(true);
+        try {
+            await onSubmit(mobile.trim(), code.trim());
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            setSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="mt-6 border-t border-white/10 pt-5 text-left">
+            <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.16em] opacity-45" style={{ color: 'var(--text-secondary)' }}>
+                {title}
+            </p>
+            <p className="mb-3 whitespace-pre-line text-center text-[11px] leading-snug opacity-55" style={{ color: 'var(--text-secondary)' }}>
+                {hint}
+            </p>
+            <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={mobile}
+                onChange={event => setMobile(event.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder={mobilePlaceholder}
+                className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-white/25"
+            />
+            <div className="mt-2 flex items-center gap-2">
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder={codePlaceholder}
+                    className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm text-white placeholder-white/30 outline-none focus:border-white/25"
+                />
+                <button
+                    type="button"
+                    onClick={() => void handleSend()}
+                    disabled={!canSend}
+                    className="shrink-0 rounded-xl bg-white/10 px-3 py-2.5 text-xs font-semibold text-white/80 transition-colors hover:bg-white/15 disabled:cursor-default disabled:opacity-40"
+                >
+                    {sending ? sendingLabel : cooldown > 0 ? `${cooldown}s` : sendCodeLabel}
+                </button>
+            </div>
+            <button
+                type="button"
+                onClick={() => void handleSubmit()}
+                disabled={!canSubmit}
+                className="mt-3 w-full rounded-xl bg-green-500/90 px-3 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-500 disabled:cursor-default disabled:opacity-40"
+            >
+                {submitting ? submittingLabel : submitLabel}
+            </button>
+            {(error || sent) && (
+                <p className={`mt-2 text-[11px] leading-snug ${error ? 'text-red-400' : 'text-green-400'}`}>
+                    {error || '验证码已发送，请查看手机短信'}
+                </p>
+            )}
+        </div>
+    );
 };
 
 const OnlineProviderLoginModal = ({
@@ -60,6 +190,7 @@ const OnlineProviderLoginModal = ({
     loginMethods,
     backendFailure,
     failureHelp,
+    phoneLogin,
     onRetry,
     onClose,
 }: OnlineProviderLoginModalProps) => {
@@ -193,6 +324,7 @@ const OnlineProviderLoginModal = ({
                         </div>
                     )}
                 </div>
+                {phoneLogin && <PhoneLoginForm {...phoneLogin} />}
                 <p className="text-[10px] opacity-30 mt-6" style={{ color: 'var(--text-secondary)' }}>{note}</p>
             </motion.div>
         </motion.div>
