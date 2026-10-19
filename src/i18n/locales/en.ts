@@ -1311,6 +1311,8 @@ export default {
     "loginTitleQq": "Scan to sign in to QQ Music",
     "loginTitleBodian": "Scan with Bodian Music",
     "loginNoteBodian": "Scan this code with the Bodian Music app and confirm sign-in",
+    "loginTitleSoda": "Scan with Douyin to sign in to Soda",
+    "loginNoteSoda": "Soda uses your Douyin account: open Douyin, tap +, then Scan",
     "loginNoteQq": "Choose the sign-in method matching your account: QQ scan or WeChat scan",
     "qqLoginMethodTitle": "Choose sign-in method",
     "qqLoginMethodHint": "Use QQ scan for a QQ account, or WeChat scan for a WeChat account",
