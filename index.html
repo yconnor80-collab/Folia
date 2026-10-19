@@ -347,7 +347,64 @@
 })();
 </script>
 <!-- ========== 赞赏弹窗 结束 ========== -->
-
-  </body>
+<!-- ========== 启动失败兜底（不依赖任何模块） ========== -->
+<div id="boot-fail" style="display:none;position:fixed;inset:0;z-index:2147483600;background:#0b0b0d;color:#eee;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center;font:14px/1.7 -apple-system,system-ui,'Segoe UI',sans-serif">
+  <div style="font-size:17px;font-weight:600">页面没能加载完成</div>
+  <div id="boot-fail-detail" style="color:#98a2b3;font-size:12px;max-width:32em;word-break:break-all"></div>
+  <button id="boot-fail-retry" style="border:0;border-radius:999px;padding:11px 26px;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);cursor:pointer">清除缓存并重试</button>
+  <div style="color:#6b7280;font-size:12px;max-width:30em">如果一直失败，通常是网络到 Cloudflare 不通：换个网络（如切 4G/5G）或稍后再试。</div>
+</div>
+<script>
+(function () {
+  var revealed = false;
+  function reveal(msg) {
+    if (revealed) return; revealed = true;
+    var el = document.getElementById('boot-fail');
+    if (!el) return;
+    el.style.display = 'flex';
+    var d = document.getElementById('boot-fail-detail');
+    if (d && msg) d.textContent = msg;
+  }
+  setTimeout(function () {
+    if (document.getElementById('app-splash')) reveal('等待超时：脚本可能没下载完，或浏览器缓存了旧版本。');
+  }, 12000);
+  window.addEventListener('error', function (e) {
+    var t = e && e.target;
+    if (t && t.tagName === 'SCRIPT') reveal('脚本加载失败：' + (t.src || '未知地址'));
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e && e.reason;
+    if (r && String(r).indexOf('Importing a module script failed') >= 0) reveal('模块加载失败：' + String(r));
+  });
+  var btn = document.getElementById('boot-fail-retry');
+  if (btn) btn.addEventListener('click', function () {
+    btn.disabled = true; btn.textContent = '清理中…';
+    var tasks = [];
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        tasks.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+          return Promise.all(rs.map(function (x) { return x.unregister(); }));
+        }).catch(function () {}));
+      }
+      if (window.caches && caches.keys) {
+        tasks.push(caches.keys().then(function (ks) {
+          return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        }).catch(function () {}));
+      }
+    } catch (err) {}
+    Promise.all(tasks).then(function () {
+      location.replace(location.pathname + '?fresh=' + Date.now());
+    });
+  });
+  try {
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        rs.forEach(function (x) { try { x.update(); } catch (e) {} });
+      }).catch(function () {});
+    }
+  } catch (e) {}
+})();
+</script>
+<!-- ========== 启动失败兜底 结束 ========== -->  </body>
 </html>
 
