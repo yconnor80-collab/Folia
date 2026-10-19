@@ -24,5 +24,15 @@ installMemorySampleFeed();
 installGlobalVisualizerFrameRateLimiter();
 // 上下文被回收时把黑画布藏起来（歌词动画期间画布最多，黑屏多半来自这里）。
 installWebglContextGuard();
+// iOS 17.4+ 的音频会话：声明成 playback 才能切后台/锁屏继续放，且不会被其它 App 的提示音打断。
+try {
+    const audioSession = (navigator as Navigator & { audioSession?: { type?: string } }).audioSession;
+    if (audioSession) audioSession.type = 'playback';
+} catch { /* 老浏览器没有这个 API，忽略 */ }
 
-void import('./bootstrap');
+// 启动阶段标记：卡住时兜底面板会把它显示出来，用来定位是哪一步没走完。
+(window as unknown as { __foliaStage?: string }).__foliaStage = 'entry';
+void import('./bootstrap').then(
+    () => { (window as unknown as { __foliaStage?: string }).__foliaStage = 'bootstrap-loaded'; },
+    error => { (window as unknown as { __foliaStage?: string }).__foliaStage = 'bootstrap-failed'; console.error('[boot] bootstrap failed', error); },
+);
