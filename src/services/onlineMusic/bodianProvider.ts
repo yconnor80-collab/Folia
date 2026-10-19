@@ -2,7 +2,7 @@ import type { OnlineMusicProvider, ProviderAudioSource, ProviderCollection, QrLo
 import { OnlineProviderError } from '../../types/onlineMusic';
 import { createProviderSongMetadata } from '../../utils/songMetadata';
 import { parseBodianLyrics } from '../../utils/lyrics/bodianLyrics';
-import { getBodianTransportAvailability, requestBodian } from './bodianTransport';
+import { describeBodianState, getBodianTransportAvailability, requestBodian } from './bodianTransport';
 import { bodianPage, normalizeBodianCollection, normalizeBodianSong, normalizeBodianUser } from './bodianNormalize';
 import { bodianCatalog } from './bodianCatalog';
 import { bodianLibrary, clearBodianLibraryCache } from './bodianLibrary';
@@ -50,9 +50,7 @@ export const bodianProvider: OnlineMusicProvider = {
     id: 'bodian', displayName: '波点音乐', shortName: '波点',
     getAvailability: getBodianTransportAvailability,
     capabilities: {
-        search: true, playback: true, lyrics: true, wordByWordLyrics: true,
-        // 登录链路（扫码确认后账号刷新）还在定位，先关掉登录入口：用户选波点直接进，搜索/播放不受影响。
-        auth: false,
+        search: true, playback: true, lyrics: true, wordByWordLyrics: true, auth: true,
         playlists: true, albums: true, artists: true, recommendations: true,
         userLibrary: true, userAlbums: true, likes: true, mutations: true, playlistTrackMutations: true,
     },
@@ -107,6 +105,8 @@ export const bodianProvider: OnlineMusicProvider = {
         checkQr: key => requestBodian<QrLoginState>('login_qr_check', { key }),
         async cancelQr(key) { await requestBodian('login_qr_cancel', { key }); },
         getQrTtlMs: () => 5 * 60 * 1000,
+        // 登录失败时把波点自己的失败记录带进诊断报告（哪个接口、什么错）。
+        async getQrLoginDiagnostics() { return describeBodianState(); },
     },
     catalog: bodianCatalog,
     library: {
