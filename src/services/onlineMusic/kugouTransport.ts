@@ -6,6 +6,8 @@ import { readProviderSessionValue, removeProviderSessionValue, writeProviderSess
 
 export const KUGOU_OPERATIONS = [
     'register_dev', 'login_qr_key', 'login_qr_create', 'login_qr_check', 'logout',
+    // 非扫码通道：手机号验证码（发码 + 登录）。与上面的 login_qr_* 扫码流程完全独立，互不影响。
+    'captcha_sent', 'login_cellphone',
     'user_detail', 'user_vip_detail', 'youth_union_vip', 'youth_day_vip', 'youth_day_vip_upgrade',
     'user_playlist', 'user_cloud', 'user_cloud_url', 'search',
     'audio', 'krm_audio', 'song_url', 'song_climax', 'search_lyric', 'lyric', 'playlist_track_all',
@@ -23,6 +25,8 @@ const ENDPOINTS: Record<KugouOperation, string> = {
     login_qr_key: '/login/qr/key',
     login_qr_create: '/login/qr/create',
     login_qr_check: '/login/qr/check',
+    captcha_sent: '/captcha/sent',
+    login_cellphone: '/login/cellphone',
     logout: '/logout',
     user_detail: '/user/detail',
     user_vip_detail: '/user/vip/detail',
@@ -522,4 +526,40 @@ export const requestKugou = async <T = unknown>(operation: KugouOperation, param
         body = await execute(operation, params);
     }
     return body as T;
+};
+
+/**
+ * 把 KuGouMusicApi 的 {status, error_code, error} 业务失败翻译成可展示的错误。
+ * 成功约定是 status === 1 且 error_code 为 0 / 缺省；其余一律按需要重新登录处理。
+ */
+const assertKugouLoginResponseOk = (response: any, fallbackMessage: string): void => {
+    const body = response?.body ?? response;
+    const data = body?.data ?? body;
+    const status = Number(body?.status ?? data?.status ?? 1);
+    const errorCode = Number(body?.error_code ?? data?.error_code ?? data?.errcode ?? 0);
+    const message = String(body?.error ?? data?.error ?? body?.error_msg ?? data?.error_msg ?? '').trim();
+    if (status === 1 && (!errorCode || errorCode === 0)) return;
+    throw new OnlineProviderError('auth-required', message || fallbackMessage, 'kugou');
+};
+
+/**
+ * 手机号验证码通道：请求验证码。
+ * 只发一条短信，不改任何登录态；扫码登录的 key / 轮询完全不受影响。
+ */
+export const sendKugouLoginCode = async (mobile: string): Promise<void> => {
+    const response = await requestKugou('captcha_sent', { mobile: String(mobile || '').trim() });
+    assertKugouLoginResponseOk(response, '验证码发送失败');
+};
+
+/**
+ * 手机号验证码通道：用「手机号 + 验证码」登录。
+ * requestKugou 已经在每次响应后调用 persistWebSession，成功响应里的 cookie / token / userid 会直接落库，
+ * 因此这里只负责把业务错误翻译成 OnlineProviderError。
+ */
+export const loginKugouWithPhone = async (mobile: string, code: string): Promise<void> => {
+    const response = await requestKugou('login_cellphone', {
+        mobile: String(mobile || '').trim(),
+        code: String(code || '').trim(),
+    });
+    assertKugouLoginResponseOk(response, '登录失败');
 };
