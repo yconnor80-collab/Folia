@@ -105,9 +105,10 @@ export const sodaProvider: OnlineMusicProvider = {
         search: true,
         playback: true,
         lyrics: false,
-        // 汽水的扫码登录走抖音 SDK 深链，浏览器/抖音打开都是 404，等于不可用；
-        // 这里先退回「无账户」：选平台直接进，不弹登录，避免用户被死链二维码卡住。
-        auth: false,
+        // 扫码登录：二维码本身必须用「汽水音乐 App」扫（抖音 App 会 404，实测已确认）。
+        auth: true,
+        playlists: true,
+        userLibrary: true,
     },
     normalizeSong: normalizeSodaSong,
     normalizeUser: normalizeSodaUser,
