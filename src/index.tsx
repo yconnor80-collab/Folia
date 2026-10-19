@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import { installGlobalVisualizerFrameRateLimiter } from './utils/frameRateLimiter';
+import { installWebglContextGuard } from './utils/webglContextGuard';
 import { installConsoleLogCapture } from './utils/consoleLogBuffer';
 import { installDebugModule } from './services/debug/debugModule';
 import { installMemorySampleFeed } from './services/debug/memorySamples';
@@ -21,5 +22,7 @@ installMemorySampleFeed();
 // observer or the rows it retains.
 // if (import.meta.env.DEV) installCoverSizeAudit();
 installGlobalVisualizerFrameRateLimiter();
+// 上下文被回收时把黑画布藏起来（歌词动画期间画布最多，黑屏多半来自这里）。
+installWebglContextGuard();
 
 void import('./bootstrap');
