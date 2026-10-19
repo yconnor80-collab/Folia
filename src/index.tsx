@@ -43,6 +43,18 @@ const bootChunkUrl = (): string | null => {
     return link || null;
 };
 
+/** preload 链接常常不在（bootstrap 是动态 import），这时退回到构建期写下的清单。 */
+const fetchManifestBootstrap = async (): Promise<string | null> => {
+    try {
+        const response = await fetch('/boot-manifest.json', { cache: 'no-store' });
+        if (!response.ok) return null;
+        const body = await response.json() as { bootstrap?: string };
+        return typeof body.bootstrap === 'string' ? body.bootstrap : null;
+    } catch {
+        return null;
+    }
+};
+
 const prefetch = (url: string, timeoutMs: number): Promise<void> => new Promise((resolve, reject) => {
     const controller = new AbortController();
     const timer = setTimeout(() => { controller.abort(); reject(new Error('prefetch timeout')); }, timeoutMs);
@@ -53,7 +65,7 @@ const prefetch = (url: string, timeoutMs: number): Promise<void> => new Promise(
 });
 
 const boot = async () => {
-    const chunk = bootChunkUrl();
+    const chunk = bootChunkUrl() || await fetchManifestBootstrap();
     if (chunk) {
         try {
             stage('prefetch');
