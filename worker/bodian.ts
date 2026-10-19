@@ -274,8 +274,21 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
                     },
                 });
             }
+            case 'liked_songs': {
+                const params = { userId: uid, fromUid: uid };
+                const liked = await callBd('/api/service/playlist/fond', { params, uid, token }).then(r => r.data).catch(() => null);
+                const listId = liked?.id;
+                if (!listId) return json({ list: [], total: 0 });
+                const data = await callBd(`/api/service/playlist/${listId}/musicList`, {
+                    params: { source: 5, ...pageParams(limit, offset) }, uid, token,
+                }).then(r => r.data).catch(() => null);
+                return json({ list: Array.isArray(data?.list) ? data.list : [], total: Number(data?.total) || 0 });
+            }
+            case 'user_albums':
+                return json({ albumList: [], bodianPagination: { nextOffset: offset, hasMore: false } });
             default:
-                return errorJson(`unsupported bodian op: ${op}`, 501);
+                // 账号刷新会连带很多可选能力：不认识的先回空结构，别用它把登录判失败。
+                return json({});
         }
     } catch (error) {
         return errorJson(String((error as Error)?.message || error));
