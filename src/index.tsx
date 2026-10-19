@@ -69,10 +69,28 @@ const boot = async () => {
             }
         }
     }
+    // 没有预取到 URL（HTML 里没有 preload 链接）时，import 本身仍可能挂住：给它一个 8 秒上限，
+    // 到点就整页重载一次（HTML 已是 no-store，重载会拿到新 chunk 名并换新连接），仅重试一次。
+    stage('import-pending');
+    let settled = false;
+    const timer = setTimeout(() => {
+        if (settled) return;
+        stage('import-timeout');
+        let retried = false;
+        try { retried = sessionStorage.getItem('folia.boot.retried') === '1'; } catch { /* ignore */ }
+        if (!retried) {
+            try { sessionStorage.setItem('folia.boot.retried', '1'); } catch { /* ignore */ }
+            location.reload();
+        }
+    }, 8000);
     try {
         await import('./bootstrap');
+        settled = true;
+        clearTimeout(timer);
         stage('bootstrap-loaded');
     } catch (error) {
+        settled = true;
+        clearTimeout(timer);
         stage('bootstrap-failed');
         console.error('[boot] bootstrap failed', error);
     }
