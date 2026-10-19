@@ -235,6 +235,7 @@
 
 下面这些边的依赖方向本身就是错的：
 
+- `src/library/suites/bravais/BravaisSeamAccount.tsx` → `src/services/onlineMusic/kugouProvider.ts`  —— 普通调用应经过 omni，不应直连 provider adapter/transport
 - `src/library/suites/grid/account/GridAccountSurface.tsx` → `src/services/onlineMusic/kugouProvider.ts`  —— 普通调用应经过 omni，不应直连 provider adapter/transport
 - `src/stores/useVisualizerSettingsStore.ts` → `src/components/visualizer/registry.tsx`  —— store 不应依赖组件
 
