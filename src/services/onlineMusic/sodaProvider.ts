@@ -189,11 +189,13 @@ export const sodaProvider: OnlineMusicProvider = {
             const cached = qrSessions.get(key);
             const result = await requestSodaQrStatus(key, cached?.cookie || '');
             const status = String(result.status || '');
-            if (status === 'confirmed' && result.sessionid) {
+            // sessionid 才是登录成功的凭据：只要拿到就直接确认，不再依赖 status 文案。
+            if (result.sessionid) {
                 writeProviderSessionValue('soda', SESSIONID_KEY, result.sessionid);
                 qrSessions.delete(key);
                 return { state: 'confirmed' };
             }
+            if (status === 'confirmed') return { state: 'confirmed' };
             if (status === 'new') return { state: 'waiting' };
             if (status === 'scanned') return { state: 'scanned' };
             if (status === 'expired') return { state: 'expired' };
