@@ -4,6 +4,8 @@
 //   GET/POST https://bd-api.kuwo.cn{path} + desktop 头 + md5 签名（盐 kuwotest）
 // 会话（uid/token）由前端保存并在每次请求里带过来，Worker 不存任何凭据。
 
+import QRCode from 'qrcode';
+
 const API_ORIGIN = 'https://bd-api.kuwo.cn';
 const SALT = 'kuwotest';
 // 稳定的设备标识（32 位小写 hex）。同一实例共用一个，够用；要隔离可以改成按客户端生成。
@@ -95,6 +97,27 @@ const desktopHeaders = (uid: string, token: string): Record<string, string> => (
     'Content-Type': 'application/json',
     ...(uid && uid !== '-1' ? { uid, token } : {}),
 });
+
+
+/**
+ * 把文本渲染成二维码 SVG（data URI）。只用 qrcode 的矩阵，不依赖 canvas/pngjs，
+ * 所以在 Worker 里也能跑；返回的 data URI 直接塞给 <img src>。
+ */
+const qrSvgDataUri = (text: string): string => {
+    const qr = QRCode.create(text, { errorCorrectionLevel: 'M' });
+    const size = qr.modules.size;
+    const data = qr.modules.data;
+    const margin = 3;
+    const dim = size + margin * 2;
+    let path = '';
+    for (let y = 0; y < size; y += 1) {
+        for (let x = 0; x < size; x += 1) {
+            if (data[y * size + x]) path += `M${x + margin},${y + margin}h1v1h-1z`;
+        }
+    }
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 ${dim} ${dim}" shape-rendering="crispEdges"><rect width="100%" height="100%" fill="#fff"/><path d="${path}" fill="#000"/></svg>`;
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+};
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
     status,
@@ -198,6 +221,13 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
             case 'qr_key': {
                 const data = (await callBd('/api/ucenter/login/qrCode', { signed: true, uid: '-1', token: '' })).data;
                 return json({ key: String(data?.qrCode || '') });
+            }
+            case 'qr_create': {
+                const key = url.searchParams.get('key') || '';
+                if (!key) return errorJson('key is required', 400);
+                const target = new URL('https://bodian-oia.kuwo.cn/bodian/download.html');
+                target.search = new URLSearchParams({ pageName: 'login_pc', pt: '3', id: key }).toString();
+                return json({ imageUrl: qrSvgDataUri(target.toString()) });
             }
             case 'qr_check': {
                 const data = (await callBd('/api/ucenter/login/qrCodeStatus', { params: { qrCode: id }, signed: true })).data;
