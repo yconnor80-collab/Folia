@@ -92,7 +92,8 @@ export default {
     // HTML 永远回源：边缘缓存过的旧 index 会引用已经被新构建替换掉的 chunk，
     // 表现就是模块图补不齐、页面永远白屏（换网络也没用）。
     const contentType = assetResponse.headers.get("content-type") || "";
-    if (contentType.includes("text/html")) {
+    // boot-manifest.json 里的文件名每次构建都会变，必须不缓存，否则客户端会预取旧地址。
+    if (contentType.includes("text/html") || url.pathname === "/boot-manifest.json") {
       const headers = new Headers(assetResponse.headers);
       headers.set("cache-control", "no-store, no-cache, must-revalidate");
       headers.set("pragma", "no-cache");
