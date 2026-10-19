@@ -4,7 +4,6 @@ import { handleGenerateOpenAITheme } from "./generate-theme_openai.ts";
 import { handleLyricProxy } from "./lyric-proxy.ts";
 import { handleSegmentLyrics } from "./segment-lyrics.ts";
 import { QQ_API_PREFIX, type QqServerlessEnv, handleQq } from "./qq.ts";
-import { handleSoda } from "./soda.ts";
 import { handleBodian } from "./bodian.ts";
 
 // qq-music-api uses Buffer during requests; Workers do not expose it without nodejs_compat.
@@ -30,8 +29,6 @@ type Env = {
   OPENAI_API_URL?: string;
   OPENAI_API_MODEL?: string;
   OPENAI_API_TEMPERATURE?: string;
-  /** 汽水音乐的第三方解析服务地址，默认 https://qiuyu520.fun/qishuiParse。 */
-  SODA_PARSE_BASE?: string;
 } & QqServerlessEnv;
 
 export default {
@@ -77,18 +74,6 @@ export default {
       return fetch(new Request(target, request));
     }
 
-    // 汽水音乐：搜索 + 播放直链。同样自己兜住异常，别把整站带下去。
-    if (url.pathname === "/api/soda" || url.pathname.startsWith("/api/soda/")) {
-      try {
-        return await handleSoda(request, url, env.SODA_PARSE_BASE);
-      } catch (error) {
-        console.error("[worker] soda route failed:", error);
-        return new Response(
-          JSON.stringify({ error: "soda route failed" }),
-          { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
-        );
-      }
-    }
 
     // 波点音乐：网页/App 没有 Electron 桥，这里按桌面协议复刻（同源 /api/bodian）。
     if (url.pathname === "/api/bodian" || url.pathname.startsWith("/api/bodian/")) {
