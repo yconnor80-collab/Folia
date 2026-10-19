@@ -65,6 +65,13 @@ export function useLatticeLyricCanvas(hostRef: RefObject<HTMLDivElement | null>,
             setReady(false); setFailedKey(initial.songKey);
         };
         const session = startLatticeLyricSession(signal => {
+            // 切换渲染器时先把旧运行时销毁并让出一帧，避免新旧两个 WebGL 上下文同时存在：
+            // iOS 的上下文数量上限很低，同时存在时新的那个会创建失败，表现就是一块黑。
+            const previous = runtimeRef.current;
+            if (previous) {
+                runtimeRef.current = null;
+                previous.destroy();
+            }
             const parked = takeParkedRuntime(initial.currentTime);
             return parked ?? createLatticeLyricRuntime(host, initial, signal, onFailure);
         }, runtime => {
