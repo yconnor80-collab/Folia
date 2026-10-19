@@ -383,6 +383,7 @@
       var last = res.slice(-3).map(function (r) { return r.name.split('/').pop(); });
       if (last.length) lines.push('last: ' + last.join(', '));
     } catch (e) { lines.push('perf: n/a'); }
+    try { lines.push('stage: ' + (window.__foliaStage || 'none')); } catch (e) {}
     if (lastError) lines.push('error: ' + lastError.slice(0, 200));
     return lines.join('\n');
   }
