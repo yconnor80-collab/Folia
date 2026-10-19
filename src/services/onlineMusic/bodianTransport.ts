@@ -19,7 +19,10 @@ type BodianSession = {
     user?: { id: string; nickname: string; avatarUrl: string };
 };
 
+let memorySession: BodianSession | null = null;
+
 const readSession = (): BodianSession | null => {
+    if (memorySession) return memorySession;
     const raw = readProviderSessionValue('bodian', SESSION_KEY);
     if (!raw) return null;
     try {
@@ -31,10 +34,12 @@ const readSession = (): BodianSession | null => {
 };
 
 const writeSession = (session: BodianSession): void => {
+    memorySession = session;
     writeProviderSessionValue('bodian', SESSION_KEY, JSON.stringify(session));
 };
 
 const clearSession = (): void => {
+    memorySession = null;
     removeProviderSessionValue('bodian', SESSION_KEY);
 };
 
