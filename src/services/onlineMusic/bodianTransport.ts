@@ -74,12 +74,18 @@ const toHttpQuery = (operation: BodianOperation, params: BodianParams, session: 
     return query;
 };
 
-/** 网页模式的二维码：Worker 只回 key，图在本地按桌面的同一张落地页地址生成。 */
+/**
+ * 网页模式的二维码：交给 Worker 生成（qrcode 的矩阵 + SVG，不依赖 canvas/pngjs），
+ * 前端只把返回的 data URI 直接塞进 <img src>。
+ */
 const createQrImage = async (key: string): Promise<string> => {
-    const url = new URL('https://bodian-oia.kuwo.cn/bodian/download.html');
-    url.search = new URLSearchParams({ pageName: 'login_pc', pt: '3', id: key }).toString();
-    const { toDataURL } = await import('qrcode');
-    return toDataURL(url.toString(), { width: 320, margin: 3 });
+    const response = await fetch(`/api/bodian?op=qr_create&key=${encodeURIComponent(key)}`, { credentials: 'include' });
+    if (!response.ok) {
+        throw new OnlineProviderError('network', `Bodian QR failed with ${response.status}`, 'bodian');
+    }
+    const body = await response.json() as { imageUrl?: string };
+    if (!body?.imageUrl) throw new OnlineProviderError('invalid-response', 'Bodian QR image is missing', 'bodian');
+    return body.imageUrl;
 };
 
 export async function requestBodian<T = unknown>(operation: BodianOperation, params: BodianParams = {}): Promise<T> {
