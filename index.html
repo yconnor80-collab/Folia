@@ -384,6 +384,10 @@
       if (last.length) lines.push('last: ' + last.join(', '));
     } catch (e) { lines.push('perf: n/a'); }
     try { lines.push('stage: ' + (window.__foliaStage || 'none')); } catch (e) {}
+    try {
+      var entry = document.querySelector('script[type=module][src]');
+      lines.push('build: ' + (entry ? entry.getAttribute('src').split('/').pop() : 'none'));
+    } catch (e) {}
     if (lastError) lines.push('error: ' + lastError.slice(0, 200));
     return lines.join('\n');
   }
