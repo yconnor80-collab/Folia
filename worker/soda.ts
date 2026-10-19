@@ -16,7 +16,7 @@ const PARSE_KEY_HEX = 'bf0e991833b2bdfc27f621f01b9a65348f3e89484362cdcc77e6d1606
 // passport 的固定 SDK 参数（与汽水 PC 客户端一致）。
 const PASSPORT_FIXED = {
     aid: '386088',
-    passport_jssdk_version: '2.4.13',
+    passport_jssdk_version: '4.0.2-beta.1',
     passport_jssdk_type: 'normal',
     is_from_ttaccountsdk: '1',
     next: 'https://api.qishui.com',
@@ -30,6 +30,15 @@ const PASSPORT_FIXED = {
 const WEB_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
+
+// 最近的汽水上游响应（环形缓冲，只在当前 isolate 内有效）。扫码排障用：
+// GET /api/soda/debug 能看到 check_qrconnect 到底返回了什么，不记录 Cookie。
+type SodaEvent = { at: number; path: string; status: number; contentType: string; bodyHead: string; setCookieKeys: string[] };
+const sodaEvents: SodaEvent[] = [];
+const recordSodaEvent = (event: SodaEvent): void => {
+    sodaEvents.push(event);
+    if (sodaEvents.length > 20) sodaEvents.shift();
+};
 
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
     status,
@@ -226,7 +235,12 @@ const sessionIdOf = (response: Response): string => {
  * 但 Worker 是无状态的，所以把它原样返回给前端，由前端在 status 请求里带回来。
  */
 const qrSoda = async (): Promise<Response> => {
-    const params = new URLSearchParams(PASSPORT_FIXED);
+    const params = new URLSearchParams({
+        ...PASSPORT_FIXED,
+        app_name: 'luna',
+        version_code: '30020100',
+        device_platform: 'windows',
+    });
     let response: Response;
     try {
         response = await fetch(`${PC_API_HOST}/passport/web/get_qrcode/?${params}`, {
@@ -269,6 +283,9 @@ const qrStatusSoda = async (request: Request): Promise<Response> => {
     const cookie = String(body?.cookie || '').trim();
     if (!token) return errorJson('token is required', 400);
     const form = new URLSearchParams({
+        app_name: 'luna',
+        version_code: '30020100',
+        device_platform: 'windows',
         passport_jssdk_version: PASSPORT_FIXED.passport_jssdk_version,
         passport_jssdk_type: PASSPORT_FIXED.passport_jssdk_type,
         is_from_ttaccountsdk: PASSPORT_FIXED.is_from_ttaccountsdk,
@@ -289,6 +306,8 @@ const qrStatusSoda = async (request: Request): Promise<Response> => {
                 'content-type': 'application/x-www-form-urlencoded',
                 'user-agent': WEB_UA,
                 accept: 'application/json',
+                referer: 'https://www.douyin.com/',
+                origin: 'https://www.douyin.com',
                 ...(cookie ? { cookie } : {}),
             },
             body: form.toString(),
@@ -296,12 +315,20 @@ const qrStatusSoda = async (request: Request): Promise<Response> => {
     } catch (error) {
         return errorJson(`soda qr status unreachable: ${String(error)}`);
     }
-    if (!response.ok) return errorJson(`soda qr status failed with ${response.status}`, response.status);
+    const rawText = await response.text();
+    recordSodaEvent({
+        at: Date.now(),
+        path: '/passport/web/check_qrconnect',
+        status: response.status,
+        contentType: response.headers.get('content-type') || '',
+        bodyHead: rawText.slice(0, 400),
+        setCookieKeys: setCookiesOf(response).map(line => line.split(';')[0].split('=')[0]),
+    });
     let payload: any;
     try {
-        payload = await response.json();
+        payload = JSON.parse(rawText);
     } catch {
-        return errorJson('soda qr status returned a non-JSON body');
+        return json({ status: '', sessionid: '', errorCode: 0, trace: { nonJson: rawText.slice(0, 200) } });
     }
     // 上游在「已确认」这一步的响应结构会变：status 可能只出现在 data 层，甚至缺失。
     // 这里按多路径取值，并且只要拿到 sessionid 就一律按 confirmed 处理（sessionid 才是登录成功的凭据）。
@@ -314,11 +341,13 @@ const qrStatusSoda = async (request: Request): Promise<Response> => {
         status: sessionid ? 'confirmed' : status,
         sessionid,
         errorCode,
-        // 状态既不是已知值又没有 sessionid 时，把响应骨架带回去，方便定位（不含 Cookie）。
+        // 状态既不是已知值又没有 sessionid 时，把响应骨架和原文头部带回去，方便定位（不含 Cookie）。
         trace: status || sessionid ? undefined : {
             keys: Object.keys(outer).slice(0, 12),
             message: String(payload?.message || '').slice(0, 80),
             statusRaw: String(payload?.status ?? ''),
+            httpStatus: response.status,
+            bodyHead: rawText.slice(0, 260),
         },
     });
 };
@@ -383,6 +412,9 @@ export const handleSoda = async (request: Request, url: URL, parseBase = DEFAULT
     }
     if (url.pathname === '/api/soda/me') {
         return accountSoda('/luna/pc/me', (url.searchParams.get('sessionid') || '').trim());
+    }
+    if (url.pathname === '/api/soda/debug') {
+        return json({ events: sodaEvents });
     }
     if (url.pathname === '/api/soda/playlists') {
         return accountSoda('/luna/pc/me/playlist', (url.searchParams.get('sessionid') || '').trim());
