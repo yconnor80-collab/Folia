@@ -50,7 +50,7 @@ export const bodianProvider: OnlineMusicProvider = {
     id: 'bodian', displayName: '波点音乐', shortName: '波点',
     getAvailability: getBodianTransportAvailability,
     capabilities: {
-        search: true, playback: true, lyrics: true, wordByWordLyrics: true, auth: true,
+        search: true, playback: true, lyrics: true, wordByWordLyrics: true, auth: false,
         playlists: true, albums: true, artists: true, recommendations: true,
         userLibrary: true, userAlbums: true, likes: true, mutations: true, playlistTrackMutations: true,
     },
