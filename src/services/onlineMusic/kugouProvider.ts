@@ -29,9 +29,11 @@ import { attemptChainDecision, attemptFromError, emptyAttempt, summarizePlayback
 import {
     getKugouTransportAvailability,
     hasKugouAuthenticatedSearchSession,
+    loginKugouWithPhone,
     requestKugouAnonymousSearch,
     requestKugou,
     requestKugouLegacyPlayInfo,
+    sendKugouLoginCode,
 } from './kugouTransport';
 
 // src/services/onlineMusic/kugouProvider.ts
@@ -1246,6 +1248,14 @@ export const kugouProvider: OnlineMusicProvider = {
             if (status === 2 || status === 3) return { state: 'scanned' };
             if (status === 4 || data?.token) return { state: 'confirmed' };
             return { state: 'error', message: String(valueOf(data, 'message', 'msg', 'error') || '') };
+        },
+        // 手机号 + 验证码通道：与上面的扫码流程并存，登录成功后 cookie / token / userid 由 transport 落库，
+        // getLoginStatus 下一次轮询即可读到账号。
+        async sendLoginCode(mobile) {
+            await sendKugouLoginCode(mobile);
+        },
+        async loginWithPhone(mobile, code) {
+            await loginKugouWithPhone(mobile, code);
         },
     },
     library: {
