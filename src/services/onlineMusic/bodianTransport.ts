@@ -111,7 +111,9 @@ export async function requestBodian<T = unknown>(operation: BodianOperation, par
     }
     if (operation === 'login_status') {
         const session = readSession();
-        return (session?.user || null) as T;
+        if (!session) return null as T;
+        // 有的上游响应只给 uid/token；没有昵称时用占位身份，避免控制器把登录判成失败。
+        return (session.user || { id: session.uid, nickname: '波点账号', avatarUrl: '' }) as T;
     }
     if (operation === 'logout') {
         clearSession();
