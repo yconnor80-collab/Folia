@@ -254,13 +254,25 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
                 });
             }
             case 'playlists': {
+                // 桌面 SDK 的 user_playlists 返回 { owned, liked, collected }，其中每项都带 playLists 数组；
+                // provider 侧按这个结构解析（缺字段会直接抛 invalid-response，登录后的账号刷新就会失败）。
                 const params = { userId: uid, fromUid: uid };
                 const [owned, liked, collected] = await Promise.all([
                     callBd('/api/service/playlist/userCreate', { params, uid, token }).then(r => r.data).catch(() => null),
                     callBd('/api/service/playlist/fond', { params, uid, token }).then(r => r.data).catch(() => null),
                     callBd('/api/service/collect/4/list', { params: { ...params, ...pageParams(limit, offset) }, uid, token }).then(r => r.data).catch(() => null),
                 ]);
-                return json({ owned, liked, collected });
+                const listsOf = (data: any): any[] => (
+                    Array.isArray(data?.playLists) ? data.playLists : Array.isArray(data) ? data : []
+                );
+                return json({
+                    owned: { playLists: listsOf(owned) },
+                    liked: { playLists: listsOf(liked) },
+                    collected: {
+                        playLists: listsOf(collected),
+                        bodianPagination: { nextOffset: offset, hasMore: false },
+                    },
+                });
             }
             default:
                 return errorJson(`unsupported bodian op: ${op}`, 501);
