@@ -481,9 +481,10 @@
 <!-- ========== 版本更新公告（每个版本只弹一次） ========== -->
 <div id="update-mask" style="display:none;position:fixed;inset:0;z-index:2147483500;background:rgba(0,0,0,.62);backdrop-filter:blur(14px);align-items:center;justify-content:center;padding:20px">
   <div style="width:100%;max-width:340px;background:#fff;border-radius:22px;padding:24px 22px 18px;box-shadow:0 24px 60px rgba(0,0,0,.35);text-align:center;color:#111">
-    <div style="font-size:17px;font-weight:700;letter-spacing:.2px">1.7.1 版本更新提示</div>
+    <div style="font-size:17px;font-weight:700;letter-spacing:.2px">1.7.2 版本更新提示</div>
     <p style="margin:14px 0 0;font-size:13px;line-height:1.7;color:#444;text-align:left">
-      由于无法适配汽水和波点音乐已进行删除，只保留了 QQ 音乐、网易云音乐和酷狗音乐。
+      1. 由于无法适配汽水和波点音乐已进行删除，只保留了 QQ 音乐、网易云音乐和酷狗音乐。<br>
+      2. 测试用
     </p>
     <p style="margin:14px 0 0;font-size:13px;line-height:1.7;color:#444">
       QQ 粉丝群：<b style="color:#111">1131099078</b>
@@ -493,7 +494,7 @@
 </div>
 <script>
 (function () {
-  var VERSION = '1.7.1';
+  var VERSION = '1.7.2';
   var KEY = 'folia.update.seen';
   try { if (localStorage.getItem(KEY) === VERSION) return; } catch (e) { /* 隐私模式下不阻断 */ }
   var mask = document.getElementById('update-mask');
