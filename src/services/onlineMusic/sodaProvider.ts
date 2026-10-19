@@ -105,10 +105,10 @@ export const sodaProvider: OnlineMusicProvider = {
         search: true,
         playback: true,
         lyrics: false,
-        // 扫码登录：二维码本身必须用「汽水音乐 App」扫（抖音 App 会 404，实测已确认）。
-        auth: true,
-        playlists: true,
-        userLibrary: true,
+        // 扫码登录已被上游风控封死：确认那一步固定返回 error_code 104
+        //（「当前应用版本过低或经非官方渠道下载」），试过最新 jssdk、客户端身份头、Referer 都不解锁。
+        // 因此退回无账户模式：选平台直接进，不弹二维码，搜索/播放照常。
+        auth: false,
     },
     normalizeSong: normalizeSodaSong,
     normalizeUser: normalizeSodaUser,
@@ -199,7 +199,10 @@ export const sodaProvider: OnlineMusicProvider = {
             if (status === 'new') return { state: 'waiting' };
             if (status === 'scanned') return { state: 'scanned' };
             if (status === 'expired') return { state: 'expired' };
-            return { state: 'error', message: status || 'unknown' };
+            const trace = result.trace
+                ? JSON.stringify(result.trace).slice(0, 240)
+                : '';
+            return { state: 'error', message: status || trace || 'unknown' };
         },
     },
 };
