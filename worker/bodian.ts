@@ -83,7 +83,7 @@ const signQuery = (path: string, query: Record<string, string>, body = ''): stri
     return MD5(`${seed}${path}`);
 };
 
-const desktopHeaders = (uid: string, token: string): Record<string, string> => ({
+const desktopHeaders = (deviceId: string, uid: string, token: string): Record<string, string> => ({
     'User-Agent': 'Dart/3.3 (dart:io)',
     plat: 'win',
     channel: 'W1',
@@ -92,8 +92,8 @@ const desktopHeaders = (uid: string, token: string): Record<string, string> => (
     'api-ver': 'application/json',
     brand: 'Windows',
     net: 'wifi',
-    devid: DEVICE_ID,
-    qimei36: DEVICE_ID,
+    devid: deviceId,
+    qimei36: deviceId,
     'Content-Type': 'application/json',
     ...(uid && uid !== '-1' ? { uid, token } : {}),
 });
@@ -128,9 +128,9 @@ const errorJson = (message: string, status = 502): Response => json({ error: mes
 
 const callBd = async (
     path: string,
-    options: { params?: Record<string, string | number>; body?: unknown; method?: string; signed?: boolean; uid?: string; token?: string } = {},
+    options: { params?: Record<string, string | number>; body?: unknown; method?: string; signed?: boolean; uid?: string; token?: string; deviceId?: string } = {},
 ): Promise<any> => {
-    const { params = {}, body, method = 'GET', signed = false, uid = '-1', token = '' } = options;
+    const { params = {}, body, method = 'GET', signed = false, uid = '-1', token = '', deviceId = DEVICE_ID } = options;
     const query: Record<string, string> = { ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])), uid, token };
     const bodyText = body === undefined ? '' : JSON.stringify(body);
     if (signed) {
@@ -141,7 +141,7 @@ const callBd = async (
     for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
     const response = await fetch(url.toString(), {
         method,
-        headers: desktopHeaders(uid, token),
+        headers: desktopHeaders(deviceId, uid, token),
         body: bodyText || undefined,
     });
     const payload = await response.json().catch(() => null) as any;
@@ -161,7 +161,7 @@ const searchBody = (keyword: string, limit: number, offset: number) => {
     return { keyword, correct: 1, pn, rn };
 };
 
-const audioOf = async (musicId: string, quality: string, freeSign: string, uid: string, token: string) => {
+const audioOf = async (musicId: string, quality: string, freeSign: string, uid: string, token: string, deviceId: string) => {
     const format = quality === 'lossless' || quality === 'hires'
         ? { format: 'flac', br: '2000kflac' }
         : quality === 'high'
@@ -179,7 +179,7 @@ const audioOf = async (musicId: string, quality: string, freeSign: string, uid: 
             preview: { startTime: Number(right.audition.start), endTime: Number(right.audition.end) },
         };
     }
-    const body = { devId: DEVICE_ID, musicId: Number(musicId), ...format, freeSign };
+    const body = { devId: deviceId, musicId: Number(musicId), ...format, freeSign };
     const audio = (await callBd('/api/play/music/v2/audioUrl', {
         params: { ...body, musicId }, body, signed: true, uid, token,
     })).data;
@@ -197,6 +197,8 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
         });
     }
     const op = url.searchParams.get('op') || '';
+    const dev = url.searchParams.get('dev') || '';
+    const deviceId = /^[a-f0-9]{32}$/.test(dev) ? dev : DEVICE_ID;
     const uid = url.searchParams.get('uid') || '-1';
     const token = url.searchParams.get('token') || '';
     const limit = Number(url.searchParams.get('limit') || 50);
@@ -216,10 +218,10 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
             case 'audio': {
                 const quality = url.searchParams.get('quality') || 'high';
                 const freeSign = url.searchParams.get('freeSign') || '';
-                return json(await audioOf(id, quality, freeSign, uid, token));
+                return json(await audioOf(id, quality, freeSign, uid, token, deviceId));
             }
             case 'qr_key': {
-                const data = (await callBd('/api/ucenter/login/qrCode', { signed: true, uid: '-1', token: '' })).data;
+                const data = (await callBd('/api/ucenter/login/qrCode', { signed: true, uid: '-1', token: '', deviceId })).data;
                 return json({ key: String(data?.qrCode || '') });
             }
             case 'qr_create': {
@@ -230,13 +232,13 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
                 return json({ imageUrl: qrSvgDataUri(target.toString()) });
             }
             case 'qr_check': {
-                const data = (await callBd('/api/ucenter/login/qrCodeStatus', { params: { qrCode: id }, signed: true })).data;
+                const data = (await callBd('/api/ucenter/login/qrCodeStatus', { params: { qrCode: id }, signed: true, deviceId })).data;
                 const status = Number(data?.status);
                 if (status === 1) return json({ state: 'waiting' });
                 if (status === 2) return json({ state: 'expired' });
                 if (status !== 3) return json({ state: 'waiting' });
                 const login = (await callBd('/api/ucenter/users/login', {
-                    method: 'POST', body: { authType: 10, qrCode: id }, signed: true,
+                    method: 'POST', body: { authType: 10, qrCode: id }, signed: true, deviceId,
                 })).data;
                 const raw = login?.userInfo || login?.user || login?.data?.userInfo || login?.data?.user || {};
                 const uid = String(login?.uid ?? raw?.id ?? raw?.uid ?? login?.data?.uid ?? '');
@@ -258,8 +260,8 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
                 // provider 侧按这个结构解析（缺字段会直接抛 invalid-response，登录后的账号刷新就会失败）。
                 const params = { userId: uid, fromUid: uid };
                 const [owned, liked, collected] = await Promise.all([
-                    callBd('/api/service/playlist/userCreate', { params, uid, token }).then(r => r.data).catch(() => null),
-                    callBd('/api/service/playlist/fond', { params, uid, token }).then(r => r.data).catch(() => null),
+                    callBd('/api/service/playlist/userCreate', { params, uid, token, deviceId }).then(r => r.data).catch(() => null),
+                    callBd('/api/service/playlist/fond', { params, uid, token, deviceId }).then(r => r.data).catch(() => null),
                     callBd('/api/service/collect/4/list', { params: { ...params, ...pageParams(limit, offset) }, uid, token }).then(r => r.data).catch(() => null),
                 ]);
                 const listsOf = (data: any): any[] => (
@@ -276,7 +278,7 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
             }
             case 'liked_songs': {
                 const params = { userId: uid, fromUid: uid };
-                const liked = await callBd('/api/service/playlist/fond', { params, uid, token }).then(r => r.data).catch(() => null);
+                const liked = await callBd('/api/service/playlist/fond', { params, uid, token, deviceId }).then(r => r.data).catch(() => null);
                 const listId = liked?.id;
                 if (!listId) return json({ list: [], total: 0 });
                 const data = await callBd(`/api/service/playlist/${listId}/musicList`, {
