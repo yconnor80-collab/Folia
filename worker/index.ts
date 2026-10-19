@@ -88,6 +88,16 @@ export default {
       }
     }
 
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    // HTML 永远回源：边缘缓存过的旧 index 会引用已经被新构建替换掉的 chunk，
+    // 表现就是模块图补不齐、页面永远白屏（换网络也没用）。
+    const contentType = assetResponse.headers.get("content-type") || "";
+    if (contentType.includes("text/html")) {
+      const headers = new Headers(assetResponse.headers);
+      headers.set("cache-control", "no-store, no-cache, must-revalidate");
+      headers.set("pragma", "no-cache");
+      return new Response(assetResponse.body, { status: assetResponse.status, headers });
+    }
+    return assetResponse;
   },
 };
