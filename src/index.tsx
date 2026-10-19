@@ -34,30 +34,48 @@ try {
 const stage = (value: string) => { (window as unknown as { __foliaStage?: string }).__foliaStage = value; };
 stage('entry');
 
-/**
- * 启动包的加载在个别 iOS WebView 上会「挂住」：小 chunk 都拿到了，主包那个请求却一直不结算，
- * import() 既不 resolve 也不 reject，于是一直停在 stage=entry。
- * 这里给 15 秒上限：到点还在等就自动整页重载一次（用 sessionStorage 防死循环），仍失败就标记出来。
- */
-const BOOT_TIMEOUT_MS = 15000;
-const RETRY_KEY = 'folia.boot.retried';
-let booted = false;
-
-const boot = () => {
-    const timer = setTimeout(() => {
-        if (booted) return;
-        stage('bootstrap-timeout');
-        let retried = false;
-        try { retried = sessionStorage.getItem(RETRY_KEY) === '1'; } catch { /* ignore */ }
-        if (!retried) {
-            try { sessionStorage.setItem(RETRY_KEY, '1'); } catch { /* ignore */ }
-            location.reload();
-        }
-    }, BOOT_TIMEOUT_MS);
-    void import('./bootstrap').then(
-        () => { booted = true; clearTimeout(timer); stage('bootstrap-loaded'); },
-        error => { clearTimeout(timer); stage('bootstrap-failed'); console.error('[boot] bootstrap failed', error); },
-    );
+/** 主包约 2 MB，个别 iOS WebView 上这个请求会挂住：先用 fetch 预取（可超时可换连接），再 import。 */
+const PREFETCH_TIMEOUT_MS = 8000;
+const bootChunkUrl = (): string | null => {
+    const link = Array.from(document.querySelectorAll('link[rel="modulepreload"]'))
+        .map(node => node.getAttribute('href') || '')
+        .find(href => href.includes('/bootstrap-'));
+    return link || null;
 };
 
-boot();
+const prefetch = (url: string, timeoutMs: number): Promise<void> => new Promise((resolve, reject) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => { controller.abort(); reject(new Error('prefetch timeout')); }, timeoutMs);
+    fetch(url, { signal: controller.signal, cache: 'force-cache' })
+        .then(response => (response.ok ? resolve() : reject(new Error('HTTP ' + response.status))))
+        .catch(reject)
+        .finally(() => clearTimeout(timer));
+});
+
+const boot = async () => {
+    const chunk = bootChunkUrl();
+    if (chunk) {
+        try {
+            stage('prefetch');
+            await prefetch(chunk, PREFETCH_TIMEOUT_MS);
+            stage('prefetched');
+        } catch {
+            try {
+                stage('prefetch-retry');
+                await prefetch(chunk + '?r=' + Date.now(), PREFETCH_TIMEOUT_MS);
+                stage('prefetched-retry');
+            } catch {
+                stage('prefetch-failed');
+            }
+        }
+    }
+    try {
+        await import('./bootstrap');
+        stage('bootstrap-loaded');
+    } catch (error) {
+        stage('bootstrap-failed');
+        console.error('[boot] bootstrap failed', error);
+    }
+};
+
+void boot();
