@@ -50,7 +50,9 @@ export const bodianProvider: OnlineMusicProvider = {
     id: 'bodian', displayName: '波点音乐', shortName: '波点',
     getAvailability: getBodianTransportAvailability,
     capabilities: {
-        search: true, playback: true, lyrics: true, wordByWordLyrics: true, auth: true,
+        search: true, playback: true, lyrics: true, wordByWordLyrics: true,
+        // 登录链路（扫码确认后账号刷新）还在定位，先关掉登录入口：用户选波点直接进，搜索/播放不受影响。
+        auth: false,
         playlists: true, albums: true, artists: true, recommendations: true,
         userLibrary: true, userAlbums: true, likes: true, mutations: true, playlistTrackMutations: true,
     },
