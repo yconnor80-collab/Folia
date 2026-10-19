@@ -268,6 +268,20 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       commandPinyinPlugin(),
       icuFoliaDataPlugin(),
       react(),
+      // 启动包清单：bootstrap 的产物文件名带哈希，运行时要可靠地拿到它才能「预取 + 超时重试」。
+      // 这里在打包结束时把名字写成一个稳定路径的小 JSON。
+      {
+        name: 'folia-boot-manifest',
+        generateBundle(_options, bundle) {
+          const bootName = Object.keys(bundle).find(file => /(^|\/)bootstrap-[A-Za-z0-9_-]+\.js$/.test(file));
+          if (!bootName) return;
+          this.emitFile({
+            type: 'asset',
+            fileName: 'boot-manifest.json',
+            source: JSON.stringify({ bootstrap: `/${bootName.replace(/\\/g, '/')}` }),
+          });
+        },
+      },
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
