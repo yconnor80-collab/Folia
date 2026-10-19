@@ -354,7 +354,9 @@
   <div>
     <button id="boot-fail-reload" style="border:0;border-radius:999px;padding:11px 26px;font-size:14px;font-weight:600;color:#fff;background:linear-gradient(135deg,#ff7e9d,#ff4d6d);cursor:pointer;margin-right:8px">重新加载</button>
     <button id="boot-fail-retry" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 18px;font-size:12px;color:#9ca3af;background:transparent;cursor:pointer">清除缓存</button>
+    <button id="boot-fail-copy" style="border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:9px 18px;font-size:12px;color:#9ca3af;background:transparent;cursor:pointer;margin-left:8px">复制诊断</button>
   </div>
+  <pre id="boot-fail-diag" style="display:none;max-width:36em;max-height:40vh;overflow:auto;text-align:left;white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.5;color:#9ca3af;background:#111114;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:10px;margin:0"></pre>
   <div style="color:#6b7280;font-size:12px;max-width:30em">一直失败通常是网络到 Cloudflare 不通：换个网络（如切 4G/5G）或稍后再试。</div>
 </div>
 <script>
@@ -366,14 +368,32 @@
   function stillBooting() {
     return !booted && !!document.getElementById('app-splash');
   }
+  var lastError = '';
+  function collectDiag() {
+    var lines = [];
+    lines.push('ua: ' + (navigator.userAgent || '').slice(0, 120));
+    lines.push('href: ' + location.href.slice(0, 120));
+    try {
+      lines.push('sw.controller: ' + (navigator.serviceWorker && navigator.serviceWorker.controller ? 'yes' : 'no'));
+    } catch (e) { lines.push('sw: n/a'); }
+    try {
+      var res = performance.getEntriesByType('resource').filter(function (r) { return /\/assets\/.*\.js/.test(r.name); });
+      var bytes = res.reduce(function (sum, r) { return sum + (r.transferSize || r.decodedBodySize || 0); }, 0);
+      lines.push('assets js: ' + res.length + ' loaded, ' + Math.round(bytes / 1024) + ' KB');
+      var last = res.slice(-3).map(function (r) { return r.name.split('/').pop(); });
+      if (last.length) lines.push('last: ' + last.join(', '));
+    } catch (e) { lines.push('perf: n/a'); }
+    if (lastError) lines.push('error: ' + lastError.slice(0, 200));
+    return lines.join('\n');
+  }
   function reveal(msg) {
     if (revealed) return;
     revealed = true;
-    var el = document.getElementById('boot-fail');
-    if (!el) return;
-    el.style.display = 'flex';
+    document.getElementById('boot-fail').style.display = 'flex';
     var d = document.getElementById('boot-fail-detail');
     if (d && msg) d.textContent = msg;
+    var pre = document.getElementById('boot-fail-diag');
+    if (pre) pre.textContent = collectDiag();
   }
   // 应用挂载完成后（开屏被移除）标记 booted，之后不再误报。
   var watchBoot = setInterval(function () {
@@ -389,6 +409,7 @@
     if (t && (t.tagName === 'IMG' || t.tagName === 'LINK')) return;
     if (!stillBooting()) return;
     var msg = (e && (e.message || (e.error && e.error.message))) || '';
+    lastError = msg || 'unknown';
     reveal('运行时错误：' + (msg || '未知错误'));
   }, true);
   window.addEventListener('unhandledrejection', function (e) {
@@ -396,7 +417,18 @@
     var text = r && (r.message || String(r));
     if (r && String(r).indexOf('Importing a module script failed') >= 0) { reveal('模块加载失败：' + String(r)); return; }
     if (!stillBooting()) return;
-    if (text) reveal('未处理的异常：' + String(text).slice(0, 300));
+    if (text) { lastError = String(text); reveal('未处理的异常：' + String(text).slice(0, 300)); }
+  });
+  var copyBtn = document.getElementById('boot-fail-copy');
+  if (copyBtn) copyBtn.addEventListener('click', function () {
+    var pre = document.getElementById('boot-fail-diag');
+    if (!pre) return;
+    pre.style.display = 'block';
+    var text = pre.textContent || '';
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text); }
+    } catch (e) {}
+    copyBtn.textContent = '已复制 / 已展开';
   });
   var reloadBtn = document.getElementById('boot-fail-reload');
   if (reloadBtn) reloadBtn.addEventListener('click', function () { location.reload(); });
