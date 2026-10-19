@@ -21,6 +21,29 @@ type BodianSession = {
 
 let memorySession: BodianSession | null = null;
 
+/** 最近一次失败的调用（操作名 + 错误原文），登录后账号刷新失败时进诊断报告。 */
+type BodianFailure = { at: number; operation: string; message: string };
+const recentFailures: BodianFailure[] = [];
+const noteFailure = (operation: string, error: unknown): void => {
+    const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    recentFailures.push({ at: Date.now(), operation, message: message.slice(0, 240) });
+    if (recentFailures.length > 8) recentFailures.shift();
+};
+
+/** 诊断用：会话是否存在、最近的失败记录。 */
+export const describeBodianState = (): string[] => {
+    const session = readSession();
+    const lines = [
+        `session: ${session ? `uid ${session.uid}, token ${session.token ? 'present' : 'missing'}` : 'none'}`,
+    ];
+    if (!recentFailures.length) lines.push('recent failures: none');
+    for (const item of recentFailures.slice(-5)) {
+        const clock = new Date(item.at).toISOString().slice(11, 19);
+        lines.push(`failure ${clock} ${item.operation}: ${item.message}`);
+    }
+    return lines;
+};
+
 const readSession = (): BodianSession | null => {
     if (memorySession) return memorySession;
     const raw = readProviderSessionValue('bodian', SESSION_KEY);
@@ -116,7 +139,7 @@ export async function requestBodian<T = unknown>(operation: BodianOperation, par
     }
     if (operation === 'login_status') {
         const session = readSession();
-        if (!session) return null as T;
+        if (!session) { noteFailure('login_status', 'no stored session'); return null as T; }
         // 有的上游响应只给 uid/token；没有昵称时用占位身份，避免控制器把登录判成失败。
         return (session.user || { id: session.uid, nickname: '波点账号', avatarUrl: '' }) as T;
     }
@@ -132,6 +155,7 @@ export async function requestBodian<T = unknown>(operation: BodianOperation, par
     try {
         response = await fetch(`/api/bodian?${query}`, { credentials: 'include' });
     } catch (error) {
+        noteFailure(operation, error);
         throw new OnlineProviderError('network', `Bodian API ${operation} unreachable`, 'bodian', error);
     }
 
@@ -142,6 +166,7 @@ export async function requestBodian<T = unknown>(operation: BodianOperation, par
         throw new OnlineProviderError('invalid-response', `Bodian API ${operation} returned an unreadable body`, 'bodian');
     }
     if (!response.ok) {
+        noteFailure(operation, body?.error || `HTTP ${response.status}`);
         throw new OnlineProviderError('network', String(body?.error || `Bodian API ${operation} failed`), 'bodian');
     }
 
