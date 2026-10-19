@@ -5,6 +5,7 @@ import { handleLyricProxy } from "./lyric-proxy.ts";
 import { handleSegmentLyrics } from "./segment-lyrics.ts";
 import { QQ_API_PREFIX, type QqServerlessEnv, handleQq } from "./qq.ts";
 import { handleSoda } from "./soda.ts";
+import { handleBodian } from "./bodian.ts";
 
 // qq-music-api uses Buffer during requests; Workers do not expose it without nodejs_compat.
 // 这一行在模块作用域，所以它先于 fetch handler 与下面导出的 Durable Object 具现化执行 ——
@@ -84,6 +85,19 @@ export default {
         console.error("[worker] soda route failed:", error);
         return new Response(
           JSON.stringify({ error: "soda route failed" }),
+          { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
+        );
+      }
+    }
+
+    // 波点音乐：网页/App 没有 Electron 桥，这里按桌面协议复刻（同源 /api/bodian）。
+    if (url.pathname === "/api/bodian" || url.pathname.startsWith("/api/bodian/")) {
+      try {
+        return await handleBodian(request, url);
+      } catch (error) {
+        console.error("[worker] bodian route failed:", error);
+        return new Response(
+          JSON.stringify({ error: "bodian route failed" }),
           { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
         );
       }
