@@ -15,7 +15,8 @@
     "run_worker_first": [
       "/api/*",
       "/",
-      "/index.html"
+      "/index.html",
+      "/boot-manifest.json"
     ]
   },
   "durable_objects": {
