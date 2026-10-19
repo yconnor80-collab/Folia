@@ -2,13 +2,32 @@
 // 汽水音乐（字节）的同源反代。浏览器只调 /api/soda/*，这里负责：
 //   /api/soda/search?q=&limit=&offset=  匿名搜索（api.qishui.com/luna/search/track）
 //   /api/soda/track?id=                 取播放直链（第三方解析服务，请求体 AES-256-GCM 加密）
+//   /api/soda/qr                        取登录二维码（passport get_qrcode，扫码用抖音 App）
+//   /api/soda/qr/status                 轮询扫码状态，确认后返回 sessionid
 // 说明：汽水没有公开 API。搜索靠一套 Android 设备参数匿名可用；播放直链官方接口匿名会返回空 body，
-// 所以走社区解析服务（SODA_PARSE_BASE 可换）。两者都可能随时失效，失败时返回可读的 JSON 错误。
+// 所以走社区解析服务（SODA_PARSE_BASE 可换）。扫码登录用 passport 的 web 接口，不需要额外签名；
+// 二维码会话的 Cookie 由前端在两次请求之间带回（Worker 不保存状态）。两者都可能随时失效，失败时返回可读的 JSON 错误。
 
 const SEARCH_URL = 'https://api.qishui.com/luna/search/track';
+const PC_API_HOST = 'https://api.qishui.com';
 const DEFAULT_PARSE_BASE = 'https://qiuyu520.fun/qishuiParse';
 // 解析请求体的 AES-256-GCM 密钥（来自社区实现，社区改版时这里也要跟着换）。
 const PARSE_KEY_HEX = 'bf0e991833b2bdfc27f621f01b9a65348f3e89484362cdcc77e6d1606b4a3584';
+// passport 的固定 SDK 参数（与汽水 PC 客户端一致）。
+const PASSPORT_FIXED = {
+    aid: '386088',
+    passport_jssdk_version: '2.4.13',
+    passport_jssdk_type: 'normal',
+    is_from_ttaccountsdk: '1',
+    next: 'https://api.qishui.com',
+    need_logo: 'false',
+    need_short_url: 'false',
+    is_frontier: 'true',
+    is_new_login: '1',
+    iid: '27960026095955',
+    version_code: '30020100',
+};
+const WEB_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
 
 const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
 
@@ -180,6 +199,147 @@ const trackSoda = async (id: string, parseBase: string): Promise<Response> => {
     });
 };
 
+/** Workers 里 set-cookie 可能有多条：新的 getSetCookie() 拿数组，老的只有一条合并串。 */
+const setCookiesOf = (response: Response): string[] => {
+    const headers = response.headers as Headers & { getSetCookie?: () => string[] };
+    if (typeof headers.getSetCookie === 'function') return headers.getSetCookie();
+    const raw = response.headers.get('set-cookie');
+    return raw ? [raw] : [];
+};
+
+/** 把 set-cookie 收成一次请求能带回去的 Cookie 头。 */
+const cookieHeaderOf = (response: Response): string => setCookiesOf(response)
+    .map(line => line.split(';')[0].trim())
+    .filter(Boolean)
+    .join('; ');
+
+const sessionIdOf = (response: Response): string => {
+    for (const line of setCookiesOf(response)) {
+        const match = line.match(/(?:^|[;,\s])sessionid=([^;,\s]+)/i);
+        if (match) return match[1];
+    }
+    return '';
+};
+
+/**
+ * 取登录二维码。passport 的 web 接口不需要额外签名；创建二维码时下发的 Cookie 必须带到轮询请求里，
+ * 但 Worker 是无状态的，所以把它原样返回给前端，由前端在 status 请求里带回来。
+ */
+const qrSoda = async (): Promise<Response> => {
+    const params = new URLSearchParams(PASSPORT_FIXED);
+    let response: Response;
+    try {
+        response = await fetch(`${PC_API_HOST}/passport/web/get_qrcode/?${params}`, {
+            headers: { 'user-agent': WEB_UA, accept: 'application/json' },
+        });
+    } catch (error) {
+        return errorJson(`soda qr unreachable: ${String(error)}`);
+    }
+    if (!response.ok) return errorJson(`soda qr failed with ${response.status}`, response.status);
+    let payload: any;
+    try {
+        payload = await response.json();
+    } catch {
+        return errorJson('soda qr returned a non-JSON body');
+    }
+    const data = payload?.data?.data ?? payload?.data ?? {};
+    const token = String(data.token || '');
+    const qrImage = String(data.qrcode || '');
+    if (!token || !qrImage) {
+        return errorJson(`soda qr returned no token/qrcode: ${String(payload?.message || '')}`, 502);
+    }
+    return json({
+        token,
+        qrImage,
+        expireTime: Number(data.expire_time) || 0,
+        cookie: cookieHeaderOf(response),
+        scanApp: String(data.copywriting || '').includes('抖音') ? 'douyin' : '',
+    });
+};
+
+/** 轮询扫码状态：new / scanned / confirmed / expired，确认后带上 sessionid。 */
+const qrStatusSoda = async (request: Request): Promise<Response> => {
+    let body: any = {};
+    try {
+        body = await request.json();
+    } catch {
+        body = {};
+    }
+    const token = String(body?.token || '').trim();
+    const cookie = String(body?.cookie || '').trim();
+    if (!token) return errorJson('token is required', 400);
+    const form = new URLSearchParams({
+        passport_jssdk_version: PASSPORT_FIXED.passport_jssdk_version,
+        passport_jssdk_type: PASSPORT_FIXED.passport_jssdk_type,
+        is_from_ttaccountsdk: PASSPORT_FIXED.is_from_ttaccountsdk,
+        aid: PASSPORT_FIXED.aid,
+        iid: PASSPORT_FIXED.iid,
+        need_logo: PASSPORT_FIXED.need_logo,
+        need_short_url: PASSPORT_FIXED.need_short_url,
+        is_frontier: PASSPORT_FIXED.is_frontier,
+        is_new_login: PASSPORT_FIXED.is_new_login,
+        next: PASSPORT_FIXED.next,
+        token,
+    });
+    let response: Response;
+    try {
+        response = await fetch(`${PC_API_HOST}/passport/web/check_qrconnect/`, {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/x-www-form-urlencoded',
+                'user-agent': WEB_UA,
+                accept: 'application/json',
+                ...(cookie ? { cookie } : {}),
+            },
+            body: form.toString(),
+        });
+    } catch (error) {
+        return errorJson(`soda qr status unreachable: ${String(error)}`);
+    }
+    if (!response.ok) return errorJson(`soda qr status failed with ${response.status}`, response.status);
+    let payload: any;
+    try {
+        payload = await response.json();
+    } catch {
+        return errorJson('soda qr status returned a non-JSON body');
+    }
+    const data = payload?.data?.data ?? payload?.data ?? {};
+    return json({
+        status: String(data.status || ''),
+        sessionid: sessionIdOf(response),
+        errorCode: Number(data.error_code) || 0,
+    });
+};
+
+/** 带登录态请求 PC 账号接口。sessionid 由前端在登录成功后保存并回传。 */
+const accountSoda = async (path: string, sessionid: string): Promise<Response> => {
+    if (!sessionid) return errorJson('sessionid is required', 401);
+    const query = new URLSearchParams({
+        aid: PASSPORT_FIXED.aid,
+        iid: PASSPORT_FIXED.iid,
+        version_code: PASSPORT_FIXED.version_code,
+    });
+    let response: Response;
+    try {
+        response = await fetch(`${PC_API_HOST}${path}?${query}`, {
+            headers: {
+                'user-agent': WEB_UA,
+                accept: 'application/json',
+                cookie: `sessionid=${sessionid};`,
+            },
+        });
+    } catch (error) {
+        return errorJson(`soda account unreachable: ${String(error)}`);
+    }
+    const text = await response.text();
+    if (!response.ok) return errorJson(`soda account failed with ${response.status}: ${text.slice(0, 200)}`, response.status);
+    try {
+        return json(JSON.parse(text));
+    } catch {
+        return errorJson('soda account returned a non-JSON body');
+    }
+};
+
 export const handleSoda = async (request: Request, url: URL, parseBase = DEFAULT_PARSE_BASE): Promise<Response> => {
     if (request.method === 'OPTIONS') {
         return new Response(null, {
@@ -202,6 +362,18 @@ export const handleSoda = async (request: Request, url: URL, parseBase = DEFAULT
         const id = (url.searchParams.get('id') || '').trim();
         if (!/^\d+$/.test(id)) return errorJson('soda track id must be numeric', 400);
         return trackSoda(id, parseBase);
+    }
+    if (url.pathname === '/api/soda/qr') {
+        return qrSoda();
+    }
+    if (url.pathname === '/api/soda/qr/status') {
+        return qrStatusSoda(request);
+    }
+    if (url.pathname === '/api/soda/me') {
+        return accountSoda('/luna/pc/me', (url.searchParams.get('sessionid') || '').trim());
+    }
+    if (url.pathname === '/api/soda/playlists') {
+        return accountSoda('/luna/pc/me/playlist', (url.searchParams.get('sessionid') || '').trim());
     }
     return errorJson('unknown soda route', 404);
 };
