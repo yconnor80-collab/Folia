@@ -24,6 +24,9 @@ let memorySession: BodianSession | null = null;
 /** 最近一次失败的调用（操作名 + 错误原文），登录后账号刷新失败时进诊断报告。 */
 type BodianFailure = { at: number; operation: string; message: string };
 const recentFailures: BodianFailure[] = [];
+/** 供 provider 记录非 transport 路径的失败（例如歌单归一化抛错）。 */
+export const recordBodianFailure = (operation: string, error: unknown): void => noteFailure(operation, error);
+
 const noteFailure = (operation: string, error: unknown): void => {
     const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
     recentFailures.push({ at: Date.now(), operation, message: message.slice(0, 240) });
@@ -42,6 +45,17 @@ export const describeBodianState = (): string[] => {
         lines.push(`failure ${clock} ${item.operation}: ${item.message}`);
     }
     return lines;
+};
+
+/** 每个客户端自己的 32 位设备 ID：波点登录态与它绑定，共用会导致扫码会话串号。 */
+const deviceId = (): string => {
+    const stored = readProviderSessionValue('bodian', 'deviceId');
+    if (stored && /^[a-f0-9]{32}$/.test(stored)) return stored;
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    const id = Array.from(bytes).map(byte => byte.toString(16).padStart(2, '0')).join('');
+    writeProviderSessionValue('bodian', 'deviceId', id);
+    return id;
 };
 
 const readSession = (): BodianSession | null => {
@@ -88,6 +102,7 @@ const toHttpQuery = (operation: BodianOperation, params: BodianParams, session: 
         op: operationForHttp(operation),
         uid: session?.uid || '-1',
         token: session?.token || '',
+        dev: deviceId(),
     });
     const set = (key: string, value: unknown) => {
         if (value === undefined || value === null || value === '') return;
