@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Check, Loader2, RotateCcw, ServerCog, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { BravaisAccountForm, BravaisConfirmForm, BravaisLoginForm } from './bravaisAccountModel';
@@ -6,6 +6,7 @@ import { setBravaisAccountElement, useBravaisAccountStore, type BravaisAccountAc
 import type { BravaisAccountSeamVariant } from './bravaisSeamTarget';
 import BravaisLoginFailureHelpView from './BravaisLoginFailureHelp';
 import { BravaisSeamFlip, BravaisSeamFlipText } from './BravaisSeamFlip';
+import { kugouProvider } from '../../../services/onlineMusic/kugouProvider';
 import qqIcon from '../../../assets/providers/qq.svg';
 import wechatIcon from '../../../assets/providers/wechat.svg';
 import './bravaisAccount.css';
@@ -45,8 +46,125 @@ const LoginQr: React.FC<{ qr: BravaisLoginForm['qr'] }> = ({ qr }) => (
     </div>
 );
 
-const LoginView: React.FC<{ form: BravaisLoginForm; actions: BravaisAccountActions; live: boolean }> = ({ form, actions, live }) => {
-    const { t } = useTranslation();
+// 酷狗的第二条登录通道（手机号 + 验证码），画在二维码下面。扫码流程与它互不影响：
+// 只在 provider 是 kugou 时渲染，成功后关掉表单并刷新一次页面让账号状态重新拉取。
+const KugouPhoneLogin: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+    const [mobile, setMobile] = useState('');
+    const [code, setCode] = useState('');
+    const [sending, setSending] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [cooldown, setCooldown] = useState(0);
+    const [error, setError] = useState<string | null>(null);
+    const [sent, setSent] = useState(false);
+
+    useEffect(() => {
+        if (cooldown <= 0) return undefined;
+        const timer = window.setTimeout(() => setCooldown(value => value - 1), 1000);
+        return () => window.clearTimeout(timer);
+    }, [cooldown]);
+
+    const mobileValid = /^1\d{10}$/.test(mobile.trim());
+    const canSend = mobileValid && !sending && cooldown === 0;
+    const canSubmit = mobileValid && code.trim().length > 0 && !submitting;
+
+    const handleSend = async () => {
+        if (!canSend) return;
+        setError(null);
+        setSending(true);
+        try {
+            await kugouProvider.auth?.sendLoginCode?.(mobile.trim());
+            setSent(true);
+            setCooldown(60);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+        } finally {
+            setSending(false);
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!canSubmit) return;
+        setError(null);
+        setSubmitting(true);
+        try {
+            await kugouProvider.auth?.loginWithPhone?.(mobile.trim(), code.trim());
+            onDone();
+            window.setTimeout(() => window.location.reload(), 600);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : String(err));
+            setSubmitting(false);
+        }
+    };
+
+    const inputStyle: React.CSSProperties = {
+        width: '100%',
+        boxSizing: 'border-box',
+        padding: '8px 10px',
+        borderRadius: 8,
+        border: '1px solid rgba(255,255,255,.16)',
+        background: 'rgba(255,255,255,.06)',
+        color: 'inherit',
+        fontSize: 13,
+        outline: 'none',
+    };
+    const buttonStyle: React.CSSProperties = {
+        padding: '8px 12px',
+        borderRadius: 8,
+        border: '1px solid rgba(255,255,255,.16)',
+        background: 'rgba(255,255,255,.08)',
+        color: 'inherit',
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+    };
+
+    return (
+        <div style={{ width: '100%', marginTop: 12 }} data-bravais-kugou-phone>
+            <p style={{ margin: '0 0 8px', fontSize: 11, opacity: 0.55, textAlign: 'center', letterSpacing: '.08em' }}>
+                或 手机号登录
+            </p>
+            <input
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={mobile}
+                onChange={event => setMobile(event.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="手机号"
+                style={inputStyle}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                <input
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={event => setCode(event.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="验证码"
+                    style={{ ...inputStyle, minWidth: 0, flex: 1 }}
+                />
+                <button type="button" onClick={() => void handleSend()} disabled={!canSend} style={{ ...buttonStyle, opacity: canSend ? 1 : 0.45 }}>
+                    {sending ? '发送中…' : cooldown > 0 ? `${cooldown}s` : '发送验证码'}
+                </button>
+            </div>
+            <button
+                type="button"
+                onClick={() => void handleSubmit()}
+                disabled={!canSubmit}
+                style={{ ...buttonStyle, marginTop: 8, width: '100%', opacity: canSubmit ? 1 : 0.45 }}
+            >
+                {submitting ? '登录中…' : '登录'}
+            </button>
+            {(error || sent) && (
+                <p style={{ margin: '6px 0 0', fontSize: 11, lineHeight: 1.4, color: error ? '#f87171' : '#4ade80' }}>
+                    {error || '验证码已发送，请查看手机短信'}
+                </p>
+            )}
+        </div>
+    );
+};
+
+const LoginView: React.FC<{ form: BravaisLoginForm; actions: BravaisAccountActions; live: boolean }> = ({ form, actions, live }) => {    const { t } = useTranslation();
     const rootRef = useRef<HTMLElement | null>(null);
     const setRoot = useCallback((element: HTMLElement | null) => {
         rootRef.current = element;
@@ -101,6 +219,7 @@ const LoginView: React.FC<{ form: BravaisLoginForm; actions: BravaisAccountActio
             <BravaisSeamFlip flipKey={form.qr.kind} style={QR_FACE_STYLE}>
                 <LoginQr qr={form.qr} />
             </BravaisSeamFlip>
+            {form.providerId === 'kugou' && <KugouPhoneLogin onDone={actions.close} />}
             {methods?.current && <p className="bravais-login-current">{methods.current}</p>}
             {form.status && (
                 <BravaisSeamFlipText as="p" flipKey={form.status} className={`bravais-login-status is-${form.tone}`} data-bravais-login-status>
