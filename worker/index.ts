@@ -4,6 +4,7 @@ import { handleGenerateOpenAITheme } from "./generate-theme_openai.ts";
 import { handleLyricProxy } from "./lyric-proxy.ts";
 import { handleSegmentLyrics } from "./segment-lyrics.ts";
 import { QQ_API_PREFIX, type QqServerlessEnv, handleQq } from "./qq.ts";
+import { handleSoda } from "./soda.ts";
 
 // qq-music-api uses Buffer during requests; Workers do not expose it without nodejs_compat.
 // 这一行在模块作用域，所以它先于 fetch handler 与下面导出的 Durable Object 具现化执行 ——
@@ -28,6 +29,8 @@ type Env = {
   OPENAI_API_URL?: string;
   OPENAI_API_MODEL?: string;
   OPENAI_API_TEMPERATURE?: string;
+  /** 汽水音乐的第三方解析服务地址，默认 https://qiuyu520.fun/qishuiParse。 */
+  SODA_PARSE_BASE?: string;
 } & QqServerlessEnv;
 
 export default {
@@ -63,15 +66,27 @@ export default {
         );
       }
     }
-    // KuGou API 同源反代 -> 转发到 Vercel 上的 KuGouMusicApi
-    // 前端构建时把 VITE_KUGOU_API_BASE 设为 /api/kugou 即可同源调用，避免 vercel.app 在国内被墙。
+
+    // KuGou API 同源反代：转发到 Vercel 上的 KuGouMusicApi。
+    // 前端用 VITE_KUGOU_API_BASE=/api/kugou 走同源，避免 vercel.app 在国内被墙。
+    // 少了这段，/api/kugou/* 会落到静态资源兜底并返回 index.html（表现为扫码/播放全部"登录错误"）。
     if (url.pathname === "/api/kugou" || url.pathname.startsWith("/api/kugou/")) {
       const KUGOU_API_BASE = "https://ku-gou-music-api-steel.vercel.app";
-      const target =
-        KUGOU_API_BASE +
-        url.pathname.slice("/api/kugou".length) +
-        url.search;
+      const target = KUGOU_API_BASE + url.pathname.slice("/api/kugou".length) + url.search;
       return fetch(new Request(target, request));
+    }
+
+    // 汽水音乐：搜索 + 播放直链。同样自己兜住异常，别把整站带下去。
+    if (url.pathname === "/api/soda" || url.pathname.startsWith("/api/soda/")) {
+      try {
+        return await handleSoda(request, url, env.SODA_PARSE_BASE);
+      } catch (error) {
+        console.error("[worker] soda route failed:", error);
+        return new Response(
+          JSON.stringify({ error: "soda route failed" }),
+          { status: 502, headers: { "content-type": "application/json; charset=utf-8" } },
+        );
+      }
     }
 
     return env.ASSETS.fetch(request);
