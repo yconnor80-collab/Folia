@@ -238,11 +238,19 @@ export const handleBodian = async (request: Request, url: URL): Promise<Response
                 const login = (await callBd('/api/ucenter/users/login', {
                     method: 'POST', body: { authType: 10, qrCode: id }, signed: true,
                 })).data;
-                const user = login?.userInfo || login?.user || {};
+                const raw = login?.userInfo || login?.user || login?.data?.userInfo || login?.data?.user || {};
+                const uid = String(login?.uid ?? raw?.id ?? raw?.uid ?? login?.data?.uid ?? '');
+                const token = String(login?.token || login?.data?.token || '');
+                // 上游有时只给 uid/token，不给昵称头像；这时用一个占位昵称，别让账号刷新因为空身份失败。
+                const nickname = String(raw?.nickname || raw?.name || raw?.userName || '') || '波点账号';
+                const avatarUrl = String(raw?.headImg || raw?.avatarUrl || raw?.headImgUrl || '');
+                if (!uid || !token) {
+                    return json({ state: 'error', message: 'bodian login returned no session' });
+                }
                 return json({
                     state: 'confirmed',
-                    session: { uid: String(login?.uid ?? user?.id ?? user?.uid ?? ''), token: String(login?.token || '') },
-                    user: { id: String(user?.id ?? user?.uid ?? login?.uid ?? ''), nickname: String(user?.nickname || ''), avatarUrl: String(user?.headImg || user?.avatarUrl || '') },
+                    session: { uid, token },
+                    user: { id: uid, nickname, avatarUrl },
                 });
             }
             case 'playlists': {
