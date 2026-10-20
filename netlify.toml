@@ -1,0 +1,5 @@
+[[redirects]]
+from = "/api/*"
+to = "https://zm.wwoyun.cn/:splat&quot;
+status = 200
+force = true
